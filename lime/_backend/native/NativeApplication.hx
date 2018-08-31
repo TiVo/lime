@@ -23,6 +23,14 @@ import lime.ui.KeyModifier;
 import lime.ui.Touch;
 import lime.ui.Window;
 
+#if cpp
+typedef NativeDeque<T> = cpp.vm.Deque<T>;
+#elseif java
+typedef NativeDeque<T> = java.vm.Deque<T>;
+#elseif neko
+typedef NativeDeque<T> = neko.vm.Deque<T>;
+#end
+
 #if !macro
 @:build(lime.system.CFFI.build())
 #end
@@ -53,6 +61,7 @@ class NativeApplication {
 	private var touchEventInfo = new TouchEventInfo ();
 	private var unusedTouchesPool = new List<Touch> ();
 	private var windowEventInfo = new WindowEventInfo ();
+	private var userCallbacks = new NativeDeque<Void -> Void> ();
 	
 	public var handle:Dynamic;
 	
@@ -172,6 +181,10 @@ class NativeApplication {
 				
 				updateTimer ();
 				parent.onUpdate.dispatch (applicationEventInfo.deltaTime);
+			
+			case SCHEDULE:
+				
+				runUserCallbacks ();
 			
 			case EXIT:
 				
@@ -622,6 +635,43 @@ class NativeApplication {
 	}
 	
 	
+	public function scheduleCallback (func: Void -> Void):Void {
+		
+		if (func != null) {
+			
+			userCallbacks.add (func);
+			#if !macro
+			lime_application_schedule (handle);
+			#end
+			
+		}
+		
+	}
+
+
+	private function runUserCallbacks ():Void {
+		
+		// Insert a null item into the queue to mark the point where
+		// callbacks were scheduled prior to this point.
+		userCallbacks.add (null);
+		
+		while (true) {
+			
+			var func = userCallbacks.pop (false);
+			
+			if (func == null) {
+				
+				break;
+				
+			}
+			
+			func ();
+			
+		}
+		
+	}
+	
+	
 	#if !macro
 	@:cffi private static function lime_application_create (config:Dynamic):Dynamic;
 	@:cffi private static function lime_application_event_manager_register (callback:Dynamic, eventObject:Dynamic):Void;
@@ -631,6 +681,7 @@ class NativeApplication {
 	@:cffi private static function lime_application_set_frame_rate (handle:Dynamic, value:Float):Void;
 	@:cffi private static function lime_application_update (handle:Dynamic):Bool;
 	@:cffi private static function lime_drop_event_manager_register (callback:Dynamic, eventObject:Dynamic):Void;
+	@:cffi private static function lime_application_schedule (handle:Dynamic):Void;
 	@:cffi private static function lime_gamepad_event_manager_register (callback:Dynamic, eventObject:Dynamic):Void;
 	@:cffi private static function lime_joystick_event_manager_register (callback:Dynamic, eventObject:Dynamic):Void;
 	@:cffi private static function lime_key_event_manager_register (callback:Dynamic, eventObject:Dynamic):Void;
@@ -675,6 +726,7 @@ private class ApplicationEventInfo {
 	
 	var UPDATE = 0;
 	var EXIT = 1;
+	var SCHEDULE = 2;
 	
 }
 

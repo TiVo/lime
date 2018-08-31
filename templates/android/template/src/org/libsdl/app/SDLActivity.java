@@ -348,6 +348,10 @@ public class SDLActivity extends Activity {
         return false;
     }
 
+    public static void flipBuffers()
+    {
+    }
+
     /**
      * A Handler class for Messages from native SDL applications.
      * It uses current Activities as target (e.g. for the title).
@@ -1045,6 +1049,12 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                                int format, int width, int height) {
         Log.v("SDL", "surfaceChanged()");
 
+//        Log.e("SDL", "Surface changed @ " + width + "x" + height);
+//        
+//        if (width != 1280) {
+//            getHolder().setFixedSize(1280, 720);
+//        }
+
         int sdlFormat = 0x15151002; // SDL_PIXELFORMAT_RGB565 by default
         switch (format) {
         case PixelFormat.A_8:
@@ -1175,19 +1185,9 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
         // Some SOURCE_DPAD or SOURCE_GAMEPAD are also SOURCE_KEYBOARD
         // So, we try to process them as DPAD or GAMEPAD events first, if that fails we try them as KEYBOARD
 
-        if ( (event.getSource() & InputDevice.SOURCE_GAMEPAD) != 0 ||
-                   (event.getSource() & InputDevice.SOURCE_DPAD) != 0 ) {
-            if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                if (SDLActivity.onNativePadDown(event.getDeviceId(), keyCode) == 0) {
-                    return true;
-                }
-            } else if (event.getAction() == KeyEvent.ACTION_UP) {
-                if (SDLActivity.onNativePadUp(event.getDeviceId(), keyCode) == 0) {
-                    return true;
-                }
-            }
-        }
-
+        // XXX TiVo -- reversed the order of these.  Lime really wants
+        // keyboard events, not gamepad events
+        
         if( (event.getSource() & InputDevice.SOURCE_KEYBOARD) != 0) {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 //Log.v("SDL", "key down: " + keyCode);
@@ -1198,6 +1198,19 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
                 //Log.v("SDL", "key up: " + keyCode);
                 SDLActivity.onNativeKeyUp(keyCode);
                 return true;
+            }
+        }
+
+        if ( (event.getSource() & InputDevice.SOURCE_GAMEPAD) != 0 ||
+                   (event.getSource() & InputDevice.SOURCE_DPAD) != 0 ) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                if (SDLActivity.onNativePadDown(event.getDeviceId(), keyCode) == 0) {
+                    return true;
+                }
+            } else if (event.getAction() == KeyEvent.ACTION_UP) {
+                if (SDLActivity.onNativePadUp(event.getDeviceId(), keyCode) == 0) {
+                    return true;
+                }
             }
         }
 

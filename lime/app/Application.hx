@@ -214,6 +214,19 @@ class Application extends Module {
 	}
 	
 	
+	/**
+	 * Schedules a function call to be made in the main thread of this
+	 * application as soon as possible.  This call can only be made
+	 * from a Haxe thread.
+	 * @param	func	The callback function to run
+	 */
+	public function schedule (func:Void -> Void):Void {
+		
+		return backend.scheduleCallback (func);
+		
+	}
+
+	
 	public override function onModuleExit (code:Int):Void {
 		
 		backend.exit ();

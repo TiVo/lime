@@ -1794,8 +1794,8 @@ class ProjectXMLParser extends HXProject {
 			extensionPath = Path.directory (projectFile);
 			
 		} catch (e:Dynamic) {
-			
-			LogHelper.error ("\"" + projectFile + "\" contains invalid XML data", e);
+
+			LogHelper.error ("\"" + projectFile + "\" contains invalid XML data" + e, e);
 			
 		}
 		

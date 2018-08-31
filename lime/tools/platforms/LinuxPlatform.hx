@@ -7,6 +7,7 @@ import lime.tools.helpers.AssetHelper;
 import lime.tools.helpers.CPPHelper;
 import lime.tools.helpers.DeploymentHelper;
 import lime.tools.helpers.FileHelper;
+import lime.tools.helpers.JavaHelper;
 import lime.tools.helpers.LogHelper;
 import lime.tools.helpers.NekoHelper;
 import lime.tools.helpers.NodeJSHelper;
@@ -15,6 +16,7 @@ import lime.tools.helpers.PlatformHelper;
 import lime.tools.helpers.ProcessHelper;
 import lime.project.AssetType;
 import lime.project.Architecture;
+import lime.project.Haxelib;
 import lime.project.HXProject;
 import lime.project.Platform;
 import lime.project.PlatformTarget;
@@ -61,6 +63,10 @@ class LinuxPlatform extends PlatformTarget {
 		if (project.targetFlags.exists ("neko") || project.target != PlatformHelper.hostPlatform) {
 			
 			targetType = "neko";
+			
+		} else if (project.targetFlags.exists ("java")) {
+			
+			targetType = "java";
 			
 		} else if (project.targetFlags.exists ("nodejs")) {
 			
@@ -131,6 +137,20 @@ class LinuxPlatform extends PlatformTarget {
 				
 			}
 			
+		} else if (targetType == "java") {
+			
+			var libPath = PathHelper.combine (PathHelper.getHaxelib (new Haxelib ("lime")), "templates/java/lib/");
+			
+			ProcessHelper.runCommand ("", "haxe", [ hxml, "-java-lib", libPath + "disruptor.jar", "-java-lib", libPath + "lwjgl.jar" ]);
+			ProcessHelper.runCommand (targetDirectory + "/obj", "haxelib", [ "run", "hxjava", "hxjava_build.txt", "--haxe-version", "3103" ]);
+			FileHelper.recursiveCopy (targetDirectory + "/obj/lib", PathHelper.combine (applicationDirectory, "lib"));
+#if 0 // TiVo -- jar name is not different for different builds due to TiVo-specific hack in hxjava
+			FileHelper.copyFile (targetDirectory + "/obj/ApplicationMain" + (project.debug ? "-Debug" : "") + ".jar", PathHelper.combine (applicationDirectory, project.app.file + ".jar"));
+#else
+			FileHelper.copyFile (targetDirectory + "/obj/ApplicationMain.jar", PathHelper.combine (applicationDirectory, project.app.file + ".jar"));
+#end
+			JavaHelper.copyLibraries (project.templatePaths, "Linux" + (is64 ? "64" : ""), applicationDirectory);
+			
 		} else if (targetType == "nodejs") {
 			
 			ProcessHelper.runCommand ("", "haxe", [ hxml ]);
@@ -169,7 +189,7 @@ class LinuxPlatform extends PlatformTarget {
 			
 		}
 		
-		if (PlatformHelper.hostPlatform != Platform.WINDOWS && targetType != "nodejs") {
+		if (PlatformHelper.hostPlatform != Platform.WINDOWS && targetType != "nodejs" && targetType != "java") {
 			
 			ProcessHelper.runCommand ("", "chmod", [ "755", executablePath ]);
 			
@@ -284,6 +304,10 @@ class LinuxPlatform extends PlatformTarget {
 		if (targetType == "nodejs") {
 			
 			NodeJSHelper.run (project, targetDirectory + "/bin/ApplicationMain.js", arguments);
+			
+		} else if (targetType == "java") {
+			
+			ProcessHelper.runCommand (applicationDirectory, "java", [ "-jar", project.app.file + ".jar" ].concat (arguments));
 			
 		} else if (project.target == PlatformHelper.hostPlatform) {
 			

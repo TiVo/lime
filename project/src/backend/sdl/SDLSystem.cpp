@@ -109,7 +109,7 @@ namespace lime {
 				Windows::Storage::StorageFolder folder = Windows::Storage::KnownFolders::HomeGroup;
 				std::wstring resultW (folder->Begin ());
 				std::string result (resultW.begin (), resultW.end ());
-				return result.c_str ();
+				return strdup(result.c_str ());
 				
 				#elif defined (HX_WINDOWS)
 				
@@ -120,7 +120,7 @@ namespace lime {
 				#else
 				
 				std::string result = std::string (getenv ("HOME")) + std::string ("/Desktop");
-				return result.c_str ();
+				return strdup(result.c_str ());
 				
 				#endif
 				break;
@@ -134,7 +134,7 @@ namespace lime {
 				Windows::Storage::StorageFolder folder = Windows::Storage::KnownFolders::DocumentsLibrary;
 				std::wstring resultW (folder->Begin ());
 				std::string result (resultW.begin (), resultW.end ());
-				return result.c_str ();
+				return strdup(result.c_str ());
 				
 				#elif defined (HX_WINDOWS)
 				
@@ -145,7 +145,7 @@ namespace lime {
 				#else
 				
 				std::string result = std::string (getenv ("HOME")) + std::string ("/Documents");
-				return result.c_str ();
+				return strdup(result.c_str ());
 				
 				#endif
 				break;
@@ -166,23 +166,23 @@ namespace lime {
 				
 				#elif defined (HX_MACOS)
 				
-				return "/Library/Fonts";
+				return strdup("/Library/Fonts");
 				
 				#elif defined (IPHONEOS)
 				
-				return "/System/Library/Fonts";
+				return strdup("/System/Library/Fonts");
 				
 				#elif defined (ANDROID)
 				
-				return "/system/fonts";
+				return strdup("/system/fonts");
 				
 				#elif defined (BLACKBERRY)
 				
-				return "/usr/fonts/font_repository/monotype";
+				return strdup("/usr/fonts/font_repository/monotype");
 				
 				#else
 				
-				return "/usr/share/fonts/truetype";
+				return strdup("/usr/share/fonts/truetype");
 				
 				#endif
 				break;
@@ -196,7 +196,7 @@ namespace lime {
 				Windows::Storage::StorageFolder folder = Windows::Storage::ApplicationData::Current->RoamingFolder;
 				std::wstring resultW (folder->Begin ());
 				std::string result (resultW.begin (), resultW.end ());
-				return result.c_str ();
+				return strdup(result.c_str ());
 				
 				#elif defined (HX_WINDOWS)
 				
@@ -207,7 +207,7 @@ namespace lime {
 				#else
 				
 				std::string result = getenv ("HOME");
-				return result.c_str ();
+				return strdup(result.c_str ());
 				
 				#endif
 				break;

@@ -1,6 +1,7 @@
 package lime._backend.html5;
 
 
+import haxe.Timer;
 import js.html.KeyboardEvent;
 import js.Browser;
 import lime.app.Application;
@@ -514,6 +515,17 @@ class HTML5Application {
 				Gamepad.__disconnect (id);
 				
 			}
+			
+		}
+		
+	}
+	
+	
+	public function scheduleCallback (func: Void -> Void):Void {
+		
+		if (func != null) {
+			
+			Timer.delay(func, 0);
 			
 		}
 		

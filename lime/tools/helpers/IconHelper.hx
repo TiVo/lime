@@ -370,7 +370,7 @@ class IconHelper {
 			
 		}
 		
-		if (icon == null) {
+		if ((icon == null) || (icon.path == null)) {
 			
 			return null;
 			

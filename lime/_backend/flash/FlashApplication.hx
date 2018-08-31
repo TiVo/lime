@@ -9,6 +9,7 @@ import flash.events.TouchEvent;
 import flash.ui.MultitouchInputMode;
 import flash.ui.Multitouch;
 import flash.Lib;
+import haxe.Timer;
 import lime.app.Application;
 import lime.app.Config;
 import lime.audio.AudioManager;
@@ -410,6 +411,17 @@ class FlashApplication {
 	public function setFrameRate (value:Float):Float {
 		
 		return Lib.current.stage.frameRate = value;
+		
+	}
+	
+	
+	public function scheduleCallback (func: Void -> Void):Void {
+		
+		if (func != null) {
+			
+			Timer.delay(func, 0);
+			
+		}
 		
 	}
 	

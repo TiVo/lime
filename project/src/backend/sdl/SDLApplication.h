@@ -33,6 +33,7 @@ namespace lime {
 			virtual int Quit ();
 			virtual void SetFrameRate (double frameRate);
 			virtual bool Update ();
+			virtual void Schedule ();
 			
 			void RegisterWindow (SDLWindow *window);
 		

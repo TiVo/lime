@@ -152,6 +152,14 @@ namespace lime {
 	}
 	
 	
+	void lime_application_schedule (value application) {
+		
+		Application* app = (Application*)val_data (application);
+		app->Schedule ();
+		
+	}
+	
+	
 	value lime_audio_load (value data) {
 		
 		AudioBuffer audioBuffer;
@@ -1533,6 +1541,7 @@ namespace lime {
 	DEFINE_PRIME1 (lime_application_quit);
 	DEFINE_PRIME2v (lime_application_set_frame_rate);
 	DEFINE_PRIME1 (lime_application_update);
+	DEFINE_PRIME1v (lime_application_schedule);
 	DEFINE_PRIME1 (lime_audio_load);
 	DEFINE_PRIME2 (lime_bytes_from_data_pointer);
 	DEFINE_PRIME1 (lime_bytes_get_data_pointer);

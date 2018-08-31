@@ -20,6 +20,8 @@ namespace lime {
 	const int analogAxisDeadZone = 1000;
 	std::map<int, std::map<int, int> > gamepadsAxisMap;
 	
+	const int USEREVENT_UPDATE = 0;
+	const int USEREVENT_SCHEDULE = 1;
 	
 	SDLApplication::SDLApplication () {
 		
@@ -112,21 +114,35 @@ namespace lime {
 			
 			case SDL_USEREVENT:
 				
-				currentUpdate = SDL_GetTicks ();
-				applicationEvent.type = UPDATE;
-				applicationEvent.deltaTime = currentUpdate - lastUpdate;
-				lastUpdate = currentUpdate;
-				
-				nextUpdate += framePeriod;
-				
-				while (nextUpdate <= currentUpdate) {
+				switch (event->user.code) {
 					
-					nextUpdate += framePeriod;
+					case USEREVENT_UPDATE:
+					
+						currentUpdate = SDL_GetTicks ();
+						applicationEvent.type = UPDATE;
+						applicationEvent.deltaTime = currentUpdate - lastUpdate;
+						lastUpdate = currentUpdate;
+						
+						nextUpdate += framePeriod;
+						
+						while (nextUpdate <= currentUpdate) {
+							
+							nextUpdate += framePeriod;
+							
+						}
+						
+						ApplicationEvent::Dispatch (&applicationEvent);
+						RenderEvent::Dispatch (&renderEvent);
+						break;
+					
+					case USEREVENT_SCHEDULE:
+					
+						applicationEvent.type = SCHEDULE;
+						ApplicationEvent::Dispatch (&applicationEvent);
+						break;
 					
 				}
 				
-				ApplicationEvent::Dispatch (&applicationEvent);
-				RenderEvent::Dispatch (&renderEvent);
 				break;
 			
 			case SDL_APP_WILLENTERBACKGROUND:
@@ -726,7 +742,7 @@ namespace lime {
 		SDL_Event event;
 		SDL_UserEvent userevent;
 		userevent.type = SDL_USEREVENT;
-		userevent.code = 0;
+		userevent.code = USEREVENT_UPDATE;
 		userevent.data1 = NULL;
 		userevent.data2 = NULL;
 		event.type = SDL_USEREVENT;
@@ -741,7 +757,7 @@ namespace lime {
 		
 	}
 	
-	
+		
 	bool SDLApplication::Update () {
 		
 		SDL_Event event;
@@ -806,6 +822,22 @@ namespace lime {
 		#endif
 		
 		return active;
+		
+	}
+	
+	
+	void SDLApplication::Schedule () {
+		
+		SDL_Event event;
+		SDL_UserEvent userevent;
+		userevent.type = SDL_USEREVENT;
+		userevent.code = USEREVENT_SCHEDULE;
+		userevent.data1 = NULL;
+		userevent.data2 = NULL;
+		event.type = SDL_USEREVENT;
+		event.user = userevent;
+		
+		SDL_PushEvent (&event);
 		
 	}
 	

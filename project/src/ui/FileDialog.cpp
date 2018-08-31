@@ -7,8 +7,10 @@ namespace lime {
 	
 	
 	const char* FileDialog::OpenDirectory (const char* filter, const char* defaultPath) {
-		
+
 		nfdchar_t *savePath = 0;
+#if 0 // TiVo -- disabled because NFD_OpenDirectoryDialog is not
+      // defined anywhere
 		nfdresult_t result = NFD_OpenDirectoryDialog (filter, defaultPath, &savePath);
 		
 		switch (result) {
@@ -28,6 +30,7 @@ namespace lime {
 				break;
 			
 		}
+#endif
 		
 		return savePath;
 		
@@ -37,6 +40,8 @@ namespace lime {
 	const char* FileDialog::OpenFile (const char* filter, const char* defaultPath) {
 		
 		nfdchar_t *savePath = 0;
+#if 0 // TiVo -- disabled because NFD_OpenDirectoryDialog is not
+      // defined anywhere
 		nfdresult_t result = NFD_OpenDialog (filter, defaultPath, &savePath);
 		
 		switch (result) {
@@ -56,7 +61,8 @@ namespace lime {
 				break;
 			
 		}
-		
+#endif
+        
 		return savePath;
 		
 	}
@@ -64,6 +70,8 @@ namespace lime {
 	
 	void FileDialog::OpenFiles (std::vector<const char*>* files, const char* filter, const char* defaultPath) {
 		
+#if 0 // TiVo -- disabled because NFD_OpenDirectoryDialog is not
+      // defined anywhere
 		nfdpathset_t pathSet;
 		nfdresult_t result = NFD_OpenDialogMultiple (filter, defaultPath, &pathSet);
 		
@@ -91,13 +99,16 @@ namespace lime {
 				break;
 			
 		}
-		
+        
+#endif
 	}
 	
 	
 	const char* FileDialog::SaveFile (const char* filter, const char* defaultPath) {
 		
 		nfdchar_t *savePath = 0;
+#if 0 // TiVo -- disabled because NFD_OpenDirectoryDialog is not
+      // defined anywhere
 		nfdresult_t result = NFD_SaveDialog (filter, defaultPath, &savePath);
 		
 		switch (result) {
@@ -117,6 +128,7 @@ namespace lime {
 				break;
 			
 		}
+#endif
 		
 		return savePath;
 		
