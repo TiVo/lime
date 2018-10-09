@@ -212,11 +212,12 @@ public class SDLActivity extends Activity {
                             // If Talkback is enabled and SDLSurface does not get the focus,
                             // Check if we have previously stored view or not.
                             // If Stored, give the focus to that view.
-                            if(mOnPauseFocusedView != null) {
+                            final View onPauseFocusedView = mOnPauseFocusedView;
+                            if(onPauseFocusedView != null) {
                                 mVirtualNavigationFocusHandler.postDelayed(new Runnable() {
                                     @Override
                                     public void run() {
-                                        mOnPauseFocusedView.requestFocus();
+                                        onPauseFocusedView.requestFocus();
                                     }
                                 }, 100);
                             }
@@ -262,12 +263,14 @@ public class SDLActivity extends Activity {
         }
 
         mOnPauseFocusedView = null;
-        for(int i = 0; i < mLayout.getChildCount(); i++) {
+        for (int i = 0; i < mLayout.getChildCount(); i++) {
             if (mLayout.getChildAt(i).hasFocus()) {
                 mOnPauseFocusedView = mLayout.getChildAt(i);
             }
         }
 
+        // Assume paused activities do not have focus
+        SDLActivity.mHasFocus = false;
         SDLActivity.handlePause();
     }
 
@@ -280,23 +283,26 @@ public class SDLActivity extends Activity {
            return;
         }
 
+        // Assume resumed apps always have focus
+        SDLActivity.mHasFocus = true;
         SDLActivity.handleResume();
         setTalkbackState();
-        if(shouldEnableVirtualNavigation()) {
-            if(mOnPauseFocusedView != null) {
-                // Must delay requesting focus or else Android doesn't always assign focus, 100 ms is magic!
-                mVirtualNavigationFocusHandler.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        mOnPauseFocusedView.requestFocus();
-                    }
-                }, 100);
-            }else {
-                enableVirtualNavigation();
-            }
-        }else {
+        if (shouldEnableVirtualNavigation()) {
+            enableVirtualNavigation();
+        } else {
             disableVirtualNavigation();
         }
+        final View onPauseFocusedView = mOnPauseFocusedView;
+        if (onPauseFocusedView != null) {
+            // Must delay requesting focus or else Android doesn't always
+            // assign focus, 100 ms is magic!
+            mVirtualNavigationFocusHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        onPauseFocusedView.requestFocus();
+                    }
+                }, 100);
+        }    
     }
 
     @Override
@@ -313,14 +319,10 @@ public class SDLActivity extends Activity {
         //is paused, we need to ignore such calls to retain the sanity of this
         //activity and its views. 
         if (isAppPaused && hasFocus) {
-           Log.v(TAG, "onWindowFocusChanged(): Returning because hasFocus: " + hasFocus+" isAppPaused: "+isAppPaused);
-           return;
-        } 
+            return;
+        }
 
         SDLActivity.mHasFocus = hasFocus;
-        if (hasFocus) {
-            SDLActivity.handleResume();
-        }
     }
 
     @Override
@@ -546,9 +548,11 @@ public class SDLActivity extends Activity {
                  
                  @Override
                  public boolean onKey(View v, int keyCode, KeyEvent event) {
-                     if(keyCode == KeyEvent.KEYCODE_BACK) {
+                     if(keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SEARCH) {
                          //Set back key handled or else Android will pause the app. Let SurfaceView decide
                          //if app must be paused.
+                         //Voice search key is handled here so that Tivo voice search opens and not google search
+                         //when Talkback feature is enabled
                          return true;    
                      }
                      return false;
