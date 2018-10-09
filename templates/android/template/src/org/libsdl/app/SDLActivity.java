@@ -75,12 +75,14 @@ public class SDLActivity extends Activity {
     private boolean isAppPaused;
     private Intent intentWhilePaused;
 
-    //VirtualNavigation keys when Talk back is turned on
+    // VirtualNavigation keys when Talk back is turned on
     private static VirtualDpadKey mCenterVirtualDpadKey;
     private static VirtualDpadKey mLeftVirtualDpadKey;
     private static VirtualDpadKey mRightVirtualDpadKey;
     private static VirtualDpadKey mUpVirtualDpadKey;
     private static VirtualDpadKey mDownVirtualDpadKey;
+
+    private static boolean mShouldStartVirtualKeyPresses;
 
     // focused view on onPause state
     private static View mOnPauseFocusedView; 
@@ -150,7 +152,8 @@ public class SDLActivity extends Activity {
         mDownVirtualDpadKey = null;
         mIsTalkbackEnabled = false;
         mOnPauseFocusedView = null;
-		mAOBroadcastReceiver = null;
+        mAOBroadcastReceiver = null;
+        mShouldStartVirtualKeyPresses = false;
     }
 
     // Setup
@@ -266,6 +269,7 @@ public class SDLActivity extends Activity {
         this.registerAOBroadcastReceiverIfNecessary();
     }
 
+    @Override
     protected void onNewIntent(Intent intent)
     {
         Log.v(TAG, "onNewIntent(): " + intent.toUri(0));
@@ -273,13 +277,44 @@ public class SDLActivity extends Activity {
         // If app is paused, don't handle the new intent immediately --
         // instead wait until a delay after the app is resumed
         if (isAppPaused) {
-            this.intentWhilePaused = intent;
+            if ((intent.getAction() != null) &&
+                (intent.getAction().equals(Intent.ACTION_MAIN))) {
+                this.intentWhilePaused = intent;
+            }
+            else {
+                PowerManager pm = (PowerManager)getApplicationContext().getSystemService(Context.POWER_SERVICE);
+                PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, TAG);
+                wl.acquire();
+                this.intentWhilePaused = intent;
+                wl.release();
+            }
+
         }
         else {
             handleNewIntent(intent);
         }
     }
 
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event)
+    {
+        Log.w(TAG, "onKeyDown: ignoring key event code=" + keyCode + ", " +
+              "event=" + event + " that came when SDL surface did not have " +
+              "focus");
+
+        return true;
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event)
+    {
+        Log.w(TAG, "onKeyUp: ignoring key event code=" + keyCode + ", " +
+              "event=" + event + " that came when SDL surface did not have " +
+              "focus");
+
+        return true;
+    }
+    
     // Events -- when Android calls onStop, the app is actually going into the
     // background.  This is considered to be a "pause" for our purposes.  The
     // Android onPause() is not used for this as it actually does not bound
@@ -305,6 +340,8 @@ public class SDLActivity extends Activity {
             }
         }
 
+        this.unregisterAOBroadcastReceiverIfNecessary();
+
         // Assume paused activities do not have focus
         SDLActivity.mHasFocus = false;
         SDLActivity.handlePause();
@@ -319,9 +356,10 @@ public class SDLActivity extends Activity {
             return;
         }
 
-        if (mAOBroadcastReceiver != null) {
-		    unregisterReceiver(mAOBroadcastReceiver);
-            mAOBroadcastReceiver = null;
+        this.unregisterAOBroadcastReceiverIfNecessary();
+
+        if (mAudioTrack != null) {
+            mAudioTrack.stop();
         }
     }
 
@@ -331,6 +369,10 @@ public class SDLActivity extends Activity {
         Log.v(TAG, "onRestart()");
         super.onRestart();
         this.registerAOBroadcastReceiverIfNecessary();
+
+        if (mAudioTrack != null) {
+            mAudioTrack.play();
+        }
     }
 
     // Android onResume is called when returning to the foreground, which we
@@ -354,6 +396,8 @@ public class SDLActivity extends Activity {
         } else {
             disableVirtualNavigation();
         }
+
+        this.registerAOBroadcastReceiverIfNecessary();
         
         final View onPauseFocusedView = mOnPauseFocusedView;
         if (onPauseFocusedView != null) {
@@ -388,6 +432,14 @@ public class SDLActivity extends Activity {
         }
     }
     
+    private void unregisterAOBroadcastReceiverIfNecessary()
+    {
+        if (mAOBroadcastReceiver != null) {
+		    unregisterReceiver(mAOBroadcastReceiver);
+            mAOBroadcastReceiver = null;
+        }
+    }
+
     private void handleNewIntent(Intent intent)
     {
         // Turn Intents known to be the result of remote key presses
@@ -491,8 +543,13 @@ public class SDLActivity extends Activity {
         }
 
         super.onDestroy();
-        // Reset everything in case the user re opens the app
-        SDLActivity.initialize();
+
+        // The application cannot handle the Activity being restarted, which
+        // Android is free to do after calling onDestroy(), so just die
+        // immediately rather than misbehave on a subsequent call to
+        // onCreate() in this instance of the application.
+        Log.e(TAG, "onDestroy() now exiting the application");
+        System.exit(-1);
     }
 
     @Override
@@ -532,11 +589,11 @@ public class SDLActivity extends Activity {
     private void enableVirtualNavigation() {
         //remove any previous VirtualNavigation
         disableVirtualNavigation();
-        mCenterVirtualDpadKey = new VirtualDpadKey(VirtualDpadKeyType.CENTER, this);
         mLeftVirtualDpadKey = new VirtualDpadKey(VirtualDpadKeyType.LEFT, this);
         mRightVirtualDpadKey = new VirtualDpadKey(VirtualDpadKeyType.RIGHT, this);
         mUpVirtualDpadKey = new VirtualDpadKey(VirtualDpadKeyType.UP, this); 
         mDownVirtualDpadKey = new VirtualDpadKey(VirtualDpadKeyType.DOWN, this);
+        mCenterVirtualDpadKey = new VirtualDpadKey(VirtualDpadKeyType.CENTER, this);
         
         //Setup neighbors
         mCenterVirtualDpadKey.setNextFocusLeftId(mLeftVirtualDpadKey.getId());
@@ -554,6 +611,7 @@ public class SDLActivity extends Activity {
     } 
 
     private void disableVirtualNavigation() {
+        mShouldStartVirtualKeyPresses = false;
         if(mCenterVirtualDpadKey != null) {
             mLayout.removeView(mCenterVirtualDpadKey);
             mCenterVirtualDpadKey = null;
@@ -664,23 +722,37 @@ public class SDLActivity extends Activity {
                     if(hasFocus) {
                         switch(mVirtualDpadKeyType) {
                             case UP:
+                            if (!mShouldStartVirtualKeyPresses) {
+                                return;
+                            }
                             simulateKeyEvent(KeyEvent.KEYCODE_DPAD_UP); 
                             resetVirtualNavigationFocus();                          
                             break;
                             case DOWN:
+                            if (!mShouldStartVirtualKeyPresses) {
+                                return;
+                            }
                             simulateKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN);
                             resetVirtualNavigationFocus();
                             break;
                             case LEFT:
+                            if (!mShouldStartVirtualKeyPresses) {
+                                return;
+                            }
                             simulateKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT);
                             resetVirtualNavigationFocus();
                             break;
                             case RIGHT:
+                            if (!mShouldStartVirtualKeyPresses) {
+                                return;
+                            }
                             simulateKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT);
                             resetVirtualNavigationFocus();
                             break;
                             case CENTER:
-                            //Do nothing
+                            if (!mShouldStartVirtualKeyPresses) {
+                                mShouldStartVirtualKeyPresses = true;
+                            }
                             break;
                         }
                     }
