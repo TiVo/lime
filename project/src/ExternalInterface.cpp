@@ -409,7 +409,7 @@ namespace lime {
 		Font *font = (Font*)val_data (fontHandle);
 		wchar_t *name = font->GetFamilyName ();
 		value result = alloc_wstring (name);
-		delete name;
+		delete[] name;
 		return result;
 		#else
 		return 0;

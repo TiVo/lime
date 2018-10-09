@@ -41,11 +41,11 @@ class AndroidHelper {
 		}
 		
 		var build = "debug";
-		
-		if (project.certificate != null) {
-			
+
+        if (!project.debug) {
+            
 			build = "release";
-			
+            
 		}
 		
 		// Fix bug in Android build system, force compile

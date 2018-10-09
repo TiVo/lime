@@ -547,14 +547,49 @@ namespace lime {
 	}
 	
 	
-	//lime_curl_multi_add_handle
+    void lime_curl_multi_add_handle (double multiHandle, double easyHandle) {
+        CURLM *multi = (CURLM *) (intptr_t) multiHandle;
+		CURL *easy = (CURL *) (intptr_t) easyHandle;
+        (void) curl_multi_add_handle(multi, easy);
+    }
+
+
 	//lime_curl_multi_assign
 	//lime_curl_multi_cleanup
 	//lime_curl_multi_fdset
-	//lime_curl_multi_info_read
-	//lime_curl_multi_init
-	//lime_curl_multi_perform
-	//lime_curl_multi_remove_handle
+
+
+    double lime_curl_multi_init () {
+        return (double) (intptr_t) curl_multi_init();
+    }
+
+
+    void lime_curl_multi_perform (double multiHandle, value ready)
+    {
+        CURLM *multi = (CURLM *) (intptr_t) multiHandle;
+        int junk;
+        (void) curl_multi_perform(multi, &junk);
+        while (true) {
+            struct CURLMsg *m = curl_multi_info_read(multi, &junk);
+            if (m) {
+                val_array_push
+                    (ready, alloc_float((double) (intptr_t) m->easy_handle));
+            }
+            else {
+                break;
+            }
+        }
+    }
+
+
+    void lime_curl_multi_remove_handle(double multiHandle, double easyHandle)
+    {
+        CURLM *multi = (CURLM *) (intptr_t) multiHandle;
+		CURL *easy = (CURL *) (intptr_t) easyHandle;
+        (void) curl_multi_remove_handle(multi, easy);
+    }
+
+
 	//lime_curl_multi_setopt
 	//lime_curl_multi_socket
 	//lime_curl_multi_socket_action
@@ -603,6 +638,10 @@ namespace lime {
 	DEFINE_PRIME1 (lime_curl_easy_strerror);
 	DEFINE_PRIME4 (lime_curl_easy_unescape);
 	DEFINE_PRIME2 (lime_curl_getdate);
+    DEFINE_PRIME0 (lime_curl_multi_init);
+    DEFINE_PRIME2v (lime_curl_multi_perform);
+    DEFINE_PRIME2v (lime_curl_multi_add_handle);
+    DEFINE_PRIME2v (lime_curl_multi_remove_handle);
 	DEFINE_PRIME0v (lime_curl_global_cleanup);
 	DEFINE_PRIME1 (lime_curl_global_init);
 	DEFINE_PRIME0 (lime_curl_version);

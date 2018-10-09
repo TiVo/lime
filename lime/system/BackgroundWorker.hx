@@ -4,12 +4,18 @@ package lime.system;
 import lime.app.Application;
 import lime.app.Event;
 
+// The symbol "LIME_SINGLE_THREADED" can be defined which will select
+// a single threaded implementation even on platforms that could support
+// multiple threads
+
+#if !LIME_SINGLE_THREADED
 #if cpp
 import cpp.vm.Deque;
 import cpp.vm.Thread;
 #elseif neko
 import neko.vm.Deque;
 import neko.vm.Thread;
+#end
 #end
 
 
@@ -26,8 +32,8 @@ class BackgroundWorker {
 	public var onProgress = new Event<Dynamic->Void> ();
 	
 	private var __runMessage:Dynamic;
-	
-	#if (cpp || neko)
+
+	#if ((cpp || neko) && !LIME_SINGLE_THREADED)
 	private var __messageQueue:Deque<Dynamic>;
 	private var __workerThread:Thread;
 	#end
@@ -44,7 +50,7 @@ class BackgroundWorker {
 		
 		canceled = true;
 		
-		#if (cpp || neko)
+	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
 		
 		__workerThread = null;
 		
@@ -58,7 +64,7 @@ class BackgroundWorker {
 		canceled = false;
 		__runMessage = message;
 		
-		#if (cpp || neko)
+	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
 		
 		__messageQueue = new Deque<Dynamic> ();
 		__workerThread = Thread.create (__doWork);
@@ -76,7 +82,7 @@ class BackgroundWorker {
 	
 	public function sendComplete (message:Dynamic = null):Void {
 		
-		#if (cpp || neko)
+	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
 		
 		__messageQueue.add (MESSAGE_COMPLETE);
 		__messageQueue.add (message);
@@ -97,7 +103,7 @@ class BackgroundWorker {
 	
 	public function sendError (message:Dynamic = null):Void {
 		
-		#if (cpp || neko)
+	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
 		
 		__messageQueue.add (MESSAGE_ERROR);
 		__messageQueue.add (message);
@@ -118,7 +124,7 @@ class BackgroundWorker {
 	
 	public function sendProgress (message:Dynamic = null):Void {
 		
-		#if (cpp || neko)
+	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
 		
 		__messageQueue.add (message);
 		
@@ -139,7 +145,7 @@ class BackgroundWorker {
 		
 		doWork.dispatch (__runMessage);
 		
-		//#if (cpp || neko)
+		//#if ((cpp || neko) && !LIME_SINGLE_THREADED)
 		//
 		//__messageQueue.add (MESSAGE_COMPLETE);
 		//
@@ -159,7 +165,7 @@ class BackgroundWorker {
 	
 	private function __update (deltaTime:Int):Void {
 		
-		#if (cpp || neko)
+	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
 		
 		var message = __messageQueue.pop (false);
 		

@@ -4,12 +4,19 @@ package lime.system;
 import lime.app.Application;
 import lime.app.Event;
 
+
+// The symbol "LIME_SINGLE_THREADED" can be defined which will select
+// a single threaded implementation even on platforms that could support
+// multiple threads
+
+#if !LIME_SINGLE_THREADED
 #if cpp
 import cpp.vm.Deque;
 import cpp.vm.Thread;
 #elseif neko
 import neko.vm.Deque;
 import neko.vm.Thread;
+#end
 #end
 
 
@@ -24,7 +31,7 @@ class ThreadPool {
 	public var onError = new Event<Dynamic->Void> ();
 	public var onProgress = new Event<Dynamic->Void> ();
 	
-	#if (cpp || neko)
+	#if ((cpp || neko) && !LIME_SINGLE_THREADED)
 	private var __workCompleted:Int;
 	private var __workIncoming = new Deque<ThreadPoolMessage> ();
 	private var __workQueued:Int;
@@ -39,7 +46,7 @@ class ThreadPool {
 		
 		currentThreads = 0;
 		
-		#if (cpp || neko)
+	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
 		__workQueued = 0;
 		__workCompleted = 0;
 		#end
@@ -63,7 +70,7 @@ class ThreadPool {
 	
 	public function queue (state:Dynamic = null):Void {
 		
-		#if (cpp || neko)
+	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
 		
 		__workIncoming.add (new ThreadPoolMessage (WORK, state));
 		__workQueued++;
@@ -92,7 +99,7 @@ class ThreadPool {
 	
 	public function sendComplete (state:Dynamic = null):Void {
 		
-		#if (cpp || neko)
+	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
 		__workResult.add (new ThreadPoolMessage (COMPLETE, state));
 		#else
 		onComplete.dispatch (state);
@@ -103,7 +110,7 @@ class ThreadPool {
 	
 	public function sendError (state:Dynamic = null):Void {
 		
-		#if (cpp || neko)
+	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
 		__workResult.add (new ThreadPoolMessage (ERROR, state));
 		#else
 		onError.dispatch (state);
@@ -114,7 +121,7 @@ class ThreadPool {
 	
 	public function sendProgress (state:Dynamic = null):Void {
 		
-		#if (cpp || neko)
+	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
 		__workResult.add (new ThreadPoolMessage (PROGRESS, state));
 		#else
 		onProgress.dispatch (state);
@@ -123,7 +130,7 @@ class ThreadPool {
 	}
 	
 	
-	#if (cpp || neko)
+	#if ((cpp || neko) && !LIME_SINGLE_THREADED)
 	
 	private function __doWork ():Void {
 		
