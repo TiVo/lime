@@ -252,20 +252,52 @@ public class SDLActivity extends Activity {
         }
     }
 
-    // Events
+    protected void onNewIntent(Intent intent)
+    {
+        // Turn Intents known to be the result of remote key presses
+        // back into those key presses.  But not when paused, because we don't
+        // handle key presses while paused.
+        if (isAppPaused) {
+            return;
+        }
+
+        String action = intent.getAction();
+        if (action == null) {
+            return;
+        }
+
+        if (action.equals(Intent.ACTION_MAIN)) {
+            SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_HOME);
+            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_HOME);
+        }
+        else if (action.equals(Intent.ACTION_ALL_APPS)) {
+            // KEYCODE_ALL_APPS is only in Android P Developer Preview and
+            // has the value 284
+            SDLActivity.onNativeKeyDown(284);
+            SDLActivity.onNativeKeyUp(284);
+        }
+    }
+
+    // Events -- when Android calls onStop, the app is actually going into the
+    // background.  This is considered to be a "pause" for our purposes.  The
+    // Android onPause() is not used for this as it actually does not bound
+    // the scope of a background/foreground cycle (Android 'pause' is just a
+    // transient state that may not involve actually going to the background)
     @Override
-    protected void onPause() {
-        Log.v(TAG, "onPause()");
-        super.onPause();
+    protected void onStop() {
+        Log.v(TAG, "onStop()");
+        super.onStop();
         isAppPaused = true;
         if (SDLActivity.mBrokenLibraries) {
            return;
         }
 
         mOnPauseFocusedView = null;
-        for (int i = 0; i < mLayout.getChildCount(); i++) {
-            if (mLayout.getChildAt(i).hasFocus()) {
-                mOnPauseFocusedView = mLayout.getChildAt(i);
+        if (mLayout != null) {
+            for (int i = 0; i < mLayout.getChildCount(); i++) {
+                if (mLayout.getChildAt(i).hasFocus()) {
+                    mOnPauseFocusedView = mLayout.getChildAt(i);
+                }
             }
         }
 
@@ -274,10 +306,12 @@ public class SDLActivity extends Activity {
         SDLActivity.handlePause();
     }
 
+    // Android onRestart is called when returning to the foreground, which we
+    // consider to be the termination of a "pause" state
     @Override
-    protected void onResume() {
-        Log.v(TAG, "onResume()");
-        super.onResume();
+    protected void onRestart() {
+        Log.v(TAG, "onRestart()");
+        super.onRestart();
         isAppPaused = false;
         if (SDLActivity.mBrokenLibraries) {
            return;
@@ -592,7 +626,7 @@ public class SDLActivity extends Activity {
         mSurface.onKey(null, keyCode, actionUp);
     }
 
-    /** Called by onPause or surfaceDestroyed. Even if surfaceDestroyed
+    /** Called by onStop or surfaceDestroyed. Even if surfaceDestroyed
      *  is the first to be called, mIsSurfaceReady should still be set
      *  to 'true' during the call to onPause (in a usual scenario).
      */
@@ -1479,7 +1513,7 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
 
  
         boolean skip = false;
-        int requestedOrientation = SDLActivity.mSingleton.getRequestedOrientation();
+        int requestedOrientation = (SDLActivity.mSingleton == null) ? ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED : SDLActivity.mSingleton.getRequestedOrientation();
 
         if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
         {

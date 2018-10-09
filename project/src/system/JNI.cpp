@@ -539,7 +539,8 @@ namespace lime {
 		if (!gJavaObjectsMutexInit) {
 			
 			gJavaObjectsMutexInit = false;
-			pthread_mutex_init (&gJavaObjectsMutex, 0);
+            // Use recursive mutex to avoid deadlocks
+            gJavaObjectsMutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 			
 		}
 		
