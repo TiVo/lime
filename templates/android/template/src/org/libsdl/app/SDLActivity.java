@@ -630,8 +630,12 @@ public class SDLActivity extends Activity {
      *  is the first to be called, mIsSurfaceReady should still be set
      *  to 'true' during the call to onPause (in a usual scenario).
      */
-    public static void handlePause() {
-        if (!SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady) {
+    public static void handlePause()
+    {
+        /*Log.v(TAG, "handlePause(): SDLActivity.mIsPaused " + (SDLActivity.mIsPaused ? "true" : "false") + "\n" +
+                                   "SDLActivity.mIsSurfaceReady " + (SDLActivity.mIsSurfaceReady ? "true" : "false"));*/
+        if (!SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady) 
+        {
             SDLActivity.mIsPaused = true;
             SDLActivity.nativePause();
             mSurface.handlePause();
@@ -642,8 +646,13 @@ public class SDLActivity extends Activity {
      * Note: Some Android variants may send multiple surfaceChanged events, so we don't need to resume
      * every time we get one of those events, only if it comes after surfaceDestroyed
      */
-    public static void handleResume() {
-        if (SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady && SDLActivity.mHasFocus) {
+    public static void handleResume() 
+    {
+        /*Log.v(TAG, "handleResume(): SDLActivity.mIsPaused " + (SDLActivity.mIsPaused ? "true" : "false") + "\n" +
+                                   "SDLActivity.mIsSurfaceReady " + (SDLActivity.mIsSurfaceReady ? "true" : "false") + "\n" +
+                                   "SDLActivity.mHasFocus " + (SDLActivity.mHasFocus ? "true" : "false"));*/
+        if (SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady && SDLActivity.mHasFocus) 
+        {
             SDLActivity.mIsPaused = false;
             SDLActivity.nativeResume();
             mSurface.handleResume();

@@ -22,6 +22,7 @@ namespace lime {
 	
 	const int USEREVENT_UPDATE = 0;
 	const int USEREVENT_SCHEDULE = 1;
+    bool app_paused = false;
 	
 	SDLApplication::SDLApplication () {
 		
@@ -132,7 +133,17 @@ namespace lime {
 						}
 						
 						ApplicationEvent::Dispatch (&applicationEvent);
-						RenderEvent::Dispatch (&renderEvent);
+                        if (!app_paused || renderEvent.type != RENDER)
+                        {
+                            //dispatch the types other than RENDER always, 
+                            //only dispatch RENDER when unpaused.
+                            //the other types are CONTEXT_LOST and CONTEXT_RESTORED, we always need to deliver those.
+						    RenderEvent::Dispatch (&renderEvent);
+                        }
+                        else 
+                        {
+                           /* SDL_Log("SDL Application::HandleEvent-- USEREVENT_UPDATE not dispatching RenderEvent because app is paused and it's a RENDER type."); */
+                        }
 						break;
 					
 					case USEREVENT_SCHEDULE:
@@ -146,13 +157,15 @@ namespace lime {
 				break;
 			
 			case SDL_APP_WILLENTERBACKGROUND:
-				
+                //SDL_Log("SDL Application::HandleEvent-- SDL_APP_WILLENTERBACKGROUND -- app is now paused.");
+				app_paused = true;
 				windowEvent.type = WINDOW_DEACTIVATE;
 				WindowEvent::Dispatch (&windowEvent);
 				break;
 			
 			case SDL_APP_WILLENTERFOREGROUND:
-				
+                //SDL_Log("SDL Application::HandleEvent-- SDL_APP_WILLENTERFOREGROUND -- app is now unpaused.");
+				app_paused = false;
 				windowEvent.type = WINDOW_ACTIVATE;
 				WindowEvent::Dispatch (&windowEvent);
 				break;
