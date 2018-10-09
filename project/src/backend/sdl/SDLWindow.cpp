@@ -83,10 +83,17 @@ namespace lime {
 				SDL_GL_SetAttribute (SDL_GL_MULTISAMPLESAMPLES, 2);
 				
 			}
-			
-			SDL_GL_SetAttribute (SDL_GL_RED_SIZE, 5);
-			SDL_GL_SetAttribute (SDL_GL_GREEN_SIZE, 6);
-			SDL_GL_SetAttribute (SDL_GL_BLUE_SIZE, 5);
+
+			/**
+			 * TiVo -- use 8 bits per red, green, blue, and alpha, to
+			 * allow better color fidelity and also to support
+			 * transparency as needed for allowing video to show
+			 * through
+			 **/
+			SDL_GL_SetAttribute (SDL_GL_RED_SIZE, 8);
+			SDL_GL_SetAttribute (SDL_GL_GREEN_SIZE, 8);
+			SDL_GL_SetAttribute (SDL_GL_BLUE_SIZE, 8);
+			SDL_GL_SetAttribute (SDL_GL_ALPHA_SIZE, 8);
 			
 		}
 		

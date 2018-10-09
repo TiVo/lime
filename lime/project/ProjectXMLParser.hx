@@ -1427,6 +1427,23 @@ class ProjectXMLParser extends HXProject {
 							
 							certificate = new Keystore ();
 							certificate.identity = substitute (element.att.identity);
+                            if (element.has.developmentTeam) {
+
+                                certificate.developmentTeam = substitute (element.att.developmentTeam);
+                                
+                            }
+
+                            if (element.has.provisioningProfile) {
+
+                                certificate.provisioningProfile = substitute (element.att.provisioningProfile);
+                                
+                            }
+                            
+                            if (element.has.provisioningProfileSpecifier) {
+
+                                certificate.provisioningProfileSpecifier = substitute (element.att.provisioningProfileSpecifier);
+                                
+                            }
 							
 						}
 					

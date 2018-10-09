@@ -1,0 +1,4 @@
+06/03/2016
+This is a development snapshot, and so has no tagged version.  This
+is a download of the develop branch of lime, commit
+a6c93ea0501c3be01fd3daeefb702b9f560a52c7.

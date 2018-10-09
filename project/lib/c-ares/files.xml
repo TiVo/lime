@@ -1,0 +1,67 @@
+<xml>
+	
+	<files id="native-toolkit-c-ares">
+		
+		<compilerflag value="-I${NATIVE_TOOLKIT_PATH}/c-ares/include/"/>
+		<compilerflag value="-I${NATIVE_TOOLKIT_PATH}/c-ares/src/"/>
+
+		<compilerflag value="-DCARES_STATICLIB"/>
+		<compilerflag value="-DHAVE_CONFIG_H" unless="windows"/>
+		<compilerflag value="-DWIN32" if="windows"/>
+		<compilerflag value="-DALLOW_MSVC6_WITHOUT_PSDK" if="windows"/>
+
+        <section if="windows">
+            <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/windows_port.c"/>
+        </section>
+        
+		<file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares__close_sockets.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares__get_hostent.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares__read_line.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares__timeval.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_cancel.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_data.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_destroy.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_expand_name.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_expand_string.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_fds.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_free_hostent.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_free_string.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_getenv.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_gethostbyaddr.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_gethostbyname.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_getnameinfo.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_getsock.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_init.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_library_init.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_llist.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_mkquery.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_create_query.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_nowarn.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_options.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_parse_a_reply.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_parse_aaaa_reply.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_parse_mx_reply.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_parse_naptr_reply.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_parse_ns_reply.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_parse_ptr_reply.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_parse_soa_reply.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_parse_srv_reply.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_parse_txt_reply.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_platform.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_process.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_query.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_search.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_send.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_strcasecmp.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_strdup.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_strerror.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_timeout.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_version.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/ares_writev.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/bitncmp.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/inet_net_pton.c"/>
+        <file name="${NATIVE_TOOLKIT_PATH}/c-ares/src/inet_ntop.c"/>
+		
+	</files>
+	
+</xml>

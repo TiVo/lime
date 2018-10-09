@@ -33,7 +33,11 @@
 	<set name="OUTPUT_DIR" value="../ndll" unless="OUTPUT_DIR" />
 	<set name="NATIVE_TOOLKIT_PATH" value="lib" unless="NATIVE_TOOLKIT_PATH" />
 	
-	<set name="NATIVE_TOOLKIT_CURL_SSL" value="1" />
+    <!-- TiVo disable this because it conflicts with the openssl included in
+         platform/network clientcore library.  This probably means that
+         lime URL loader will not be able to use SSL, not sure if this
+         matters -->
+	<!-- <set name="NATIVE_TOOLKIT_CURL_SSL" value="1" /> -->
 	<set name="NATIVE_TOOLKIT_CURL_DISABLE_AXTLS_NONBLOCKING" value="1" />
 	<set name="NATIVE_TOOLKIT_SDL_STATIC" value="1" />
 	

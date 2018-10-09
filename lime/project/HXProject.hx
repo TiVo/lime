@@ -1247,7 +1247,25 @@ class HXProject {
 				context.KEY_STORE_IDENTITY = certificate.identity;
 				
 			}
+
+            if (certificate.developmentTeam != null) {
+
+                context.KEY_STORE_DEVELOPMENT_TEAM = certificate.developmentTeam;
+                
+            }
 			
+            if (certificate.provisioningProfile != null) {
+
+                context.KEY_STORE_PROVISIONING_PROFILE = certificate.provisioningProfile;
+                
+            }
+
+            if (certificate.provisioningProfileSpecifier != null) {
+
+                context.KEY_STORE_PROVISIONING_PROFILE_SPECIFIER = certificate.provisioningProfileSpecifier;
+                
+            }
+
 		}
 		
 		context.config = config;
