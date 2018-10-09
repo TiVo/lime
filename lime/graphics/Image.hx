@@ -494,6 +494,14 @@ class Image {
 		
 	}
 	
+	public static function fromPixels (bytes:Bytes, onload:Image -> Void = null, width: Int, height: Int):Image {
+		
+		if (bytes == null) return null;
+		var image = new Image ();
+		image.__fromPixels (bytes, onload, width, height);
+		return image;
+		
+	}
 	
 	#if (js && html5)
 	public static function fromCanvas (canvas:CanvasElement):Image {
@@ -1158,7 +1166,7 @@ class Image {
 			var data:Dynamic = lime_image_load (bytes);
 			
 			if (data != null) {
-				
+
 				__fromImageBuffer (new ImageBuffer (new UInt8Array (@:privateAccess new Bytes (data.data.length, data.data.b)), data.width, data.height, data.bitsPerPixel));
 				
 				if (onload != null) {
@@ -1177,6 +1185,54 @@ class Image {
 		
 	}
 	
+	
+	private function __fromPixels (bytes:Bytes, onload:Image -> Void, width: Int, height: Int ):Void {
+		
+		#if (js && html5)
+			
+			var type = "";
+			
+			if (__isPNG (bytes)) {
+				
+				type = "image/png";
+				
+			} else if (__isJPG (bytes)) {
+				
+				type = "image/jpeg";
+				
+			} else if (__isGIF (bytes)) {
+				
+				type = "image/gif";
+				
+			} else {
+				
+				throw "Image tried to read PNG/JPG Bytes, but found an invalid header.";
+				
+			}
+			
+			__fromBase64 (__base64Encode (bytes), type, onload);
+			
+		#elseif lime_console
+			
+			throw "Image.fromBytes not implemented for console target";
+			
+		#elseif ((cpp || neko || nodejs) && !macro)
+		    
+			__fromImageBuffer (new ImageBuffer (UInt8Array.fromBytes(bytes), width, height));
+				
+			if (onload != null) {
+					
+				onload (this);
+					
+			}
+			
+		#else
+			
+			throw "ImageBuffer.loadFromBytes not supported on this target";
+			
+		#end
+		
+	}
 	
 	private function __fromFile (path:String, onload:Image -> Void, onerror:Void -> Void):Void {
 		

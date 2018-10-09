@@ -172,24 +172,32 @@ namespace lime {
 	struct AutoHaxe {
 		
 		
+        bool noop;
 		int base;
 		const char *message;
 		
 		
 		AutoHaxe (const char *inMessage) {
-			
-			base = 0;
-			message = inMessage;
-			gc_set_top_of_stack (&base, true);
-			//__android_log_print (ANDROID_LOG_VERBOSE, "Lime", "Enter %s %p", message, pthread_self ());
-			
+
+            if (gc_is_haxe_thread()) {
+                noop = true;
+            }
+            else {
+                noop = false;
+                base = 0;
+                message = inMessage;
+                gc_set_top_of_stack (&base, true);
+                //__android_log_print (ANDROID_LOG_VERBOSE, "Lime", "Enter %s %p", message, pthread_self ());
+            }
 		}
 		
 		
 		~AutoHaxe () {
-			
-			//__android_log_print (ANDROID_LOG_VERBOSE, "Lime", "Leave %s %p", message, pthread_self ());
-			gc_set_top_of_stack (0, true);
+
+            if (!noop) {
+                //__android_log_print (ANDROID_LOG_VERBOSE, "Lime", "Leave %s %p", message, pthread_self ());
+                gc_set_top_of_stack (0, true);
+            }
 			
 		}
 		
@@ -678,6 +686,7 @@ namespace lime {
 	#define ARRAY_SET(PRIM,JTYPE,CREATE) \
 		case jni##PRIM: \
 		{ \
+            result = alloc_array (len); \
 			if (len > 0) {\
 				\
 				jboolean copy; \
@@ -818,7 +827,7 @@ namespace lime {
 		} else if (inType.arrayDepth == 1) {
 			
 			int len = inEnv->GetArrayLength ((jarray)inObject);
-			value result = alloc_array (len);
+			value result;
 			
 			switch (inType.element) {
 				
@@ -833,20 +842,12 @@ namespace lime {
 				
 				case jniByte:
 				{
-					if (len > 0) {
-						
-						jboolean copy;
-						jbyte *data = inEnv->GetByteArrayElements ((jbyteArray)inObject, &copy);
-						
-						for (int i = 0; i < len; i++) {
-							
-							val_array_set_i (result, i, alloc_int (data[i]));
-							
-						}
-						
-						inEnv->ReleaseByteArrayElements ((jbyteArray)inObject, data, JNI_ABORT);
-						
-					}
+                    jboolean copy;
+                    jbyte *data = inEnv->GetByteArrayElements
+                        ((jbyteArray) inObject, &copy);
+                    result = alloc_byte_array_from_data(data, len);
+                    inEnv->ReleaseByteArrayElements
+                        ((jbyteArray) inObject, data, JNI_ABORT);
 				}
 				break;
 				

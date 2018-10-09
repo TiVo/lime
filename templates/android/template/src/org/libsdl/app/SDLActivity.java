@@ -42,6 +42,7 @@ import org.haxe.HXCPP;
 */
 public class SDLActivity extends Activity {
     private static final String TAG = "SDL";
+    private static final boolean DEBUG = false;
 
     // Keep track of the paused state
     public static boolean mIsPaused, mIsSurfaceReady, mHasFocus;
@@ -76,7 +77,10 @@ public class SDLActivity extends Activity {
     private static VirtualDpadKey mRightVirtualDpadKey;
     private static VirtualDpadKey mUpVirtualDpadKey;
     private static VirtualDpadKey mDownVirtualDpadKey;
- 
+
+    // focused view on onPause state
+    private static View mOnPauseFocusedView; 
+
     private static boolean mIsTalkbackEnabled;
     private Handler mVirtualNavigationFocusHandler;
     private static final String mAutomationFileName = "tivoAutomation";
@@ -141,6 +145,7 @@ public class SDLActivity extends Activity {
         mUpVirtualDpadKey = null;
         mDownVirtualDpadKey = null;
         mIsTalkbackEnabled = false;
+        mOnPauseFocusedView = null;
     }
 
     // Setup
@@ -202,10 +207,24 @@ public class SDLActivity extends Activity {
                 @Override
                 public void onFocusChange(View v, boolean hasFocus) {
                     Log.i(TAG, "SDLSurface view focus change: "+hasFocus+" layout childcount: "+mLayout.getChildCount());
-                    //If SDLSurface gets focus and Talkback is enabled set the focus on 
-                    //VirtualDpadNavigation
-                    if(shouldEnableVirtualNavigation() && hasFocus) {
-                        enableVirtualNavigation();
+                    if(shouldEnableVirtualNavigation()) {
+                        if(!hasFocus) {
+                            // If Talkback is enabled and SDLSurface does not get the focus,
+                            // Check if we have previously stored view or not.
+                            // If Stored, give the focus to that view.
+                            if(mOnPauseFocusedView != null) {
+                                mVirtualNavigationFocusHandler.postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        mOnPauseFocusedView.requestFocus();
+                                    }
+                                }, 100);
+                            }
+                        }else {
+                            // If Talkback is enabled and SDLSurface gets focus, set the focus
+                            // on VirtualDpadNavigation
+                            enableVirtualNavigation();
+                        }
                     }
                 }
         });
@@ -242,6 +261,13 @@ public class SDLActivity extends Activity {
            return;
         }
 
+        mOnPauseFocusedView = null;
+        for(int i = 0; i < mLayout.getChildCount(); i++) {
+            if (mLayout.getChildAt(i).hasFocus()) {
+                mOnPauseFocusedView = mLayout.getChildAt(i);
+            }
+        }
+
         SDLActivity.handlePause();
     }
 
@@ -257,8 +283,18 @@ public class SDLActivity extends Activity {
         SDLActivity.handleResume();
         setTalkbackState();
         if(shouldEnableVirtualNavigation()) {
-            enableVirtualNavigation();
-        } else {
+            if(mOnPauseFocusedView != null) {
+                // Must delay requesting focus or else Android doesn't always assign focus, 100 ms is magic!
+                mVirtualNavigationFocusHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        mOnPauseFocusedView.requestFocus();
+                    }
+                }, 100);
+            }else {
+                enableVirtualNavigation();
+            }
+        }else {
             disableVirtualNavigation();
         }
     }
@@ -465,6 +501,9 @@ public class SDLActivity extends Activity {
             }
             setFocusable(true);
             setId(mVirtualDpadKeyType.ordinal() + 1);
+            if(!DEBUG) {
+                setBackground(null);
+            }
             setAccessibilityDelegate(new View.AccessibilityDelegate() {
                 public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
                     super.onInitializeAccessibilityNodeInfo(host, info);
