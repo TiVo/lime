@@ -19,25 +19,23 @@ TARGETS += BuildRunScript BuildTools
 PRE_BOM_TARGETS += BuildRunScript BuildTools
 
 ifeq ($(HAXE_BUILD_TARGET),android)
-TARGETS += BuildNative
-PRE_BOM_TARGETS += BuildNative
+TARGETS += BuildLibs BuildNative
+PRE_BOM_TARGETS += BuildLibs BuildNative
 endif
 
 ifeq ($(HAXE_BUILD_TARGET),ios)
-TARGETS += BuildNative
-PRE_BOM_TARGETS += BuildNative
+TARGETS += BuildLibs BuildNative
+PRE_BOM_TARGETS += BuildLibs BuildNative
 endif
 
 ifeq ($(HAXE_BUILD_TARGET),tvos)
-TARGETS += BuildNative
-PRE_BOM_TARGETS += BuildNative
+TARGETS += BuildLibs BuildNative
+PRE_BOM_TARGETS += BuildLibs BuildNative
 endif
 
-ifneq ($(HAXE_BUILD_TARGET),tivo)
-
-TARGETS += BuildLibs
-PRE_BOM_TARGETS += BuildLibs
-
+ifeq ($(HAXE_TARGET_SYSTEM),host)
+TARGETS += BuildLibs BuildNative
+PRE_BOM_TARGETS += BuildLibs BuildNative
 endif
 
 # We don't use the standard lime flags here because we are trying to

@@ -8,6 +8,7 @@
 #include <SDL.h>
 #include <map>
 #include <string>
+#include <vector>
 
 #define ELOG(args...) __android_log_print (ANDROID_LOG_ERROR, "Lime", args)
 
@@ -22,8 +23,37 @@ namespace lime {
 	
 	
 	vkind gObjectKind;
-	
-	
+
+    enum { MAX_LOCALS = 20 };
+		
+
+    // Cleans up refs
+    class RefCleaner
+    {
+    public:
+
+        RefCleaner(JNIEnv *env, std::vector<jvalue> &refs)
+            : mEnv(env), mRefs(refs)
+        {
+            env->PushLocalFrame(MAX_LOCALS);
+        }
+
+        ~RefCleaner()
+        {
+            while (!mRefs.empty()) {
+                mEnv->DeleteLocalRef(mRefs.back().l);
+                mRefs.pop_back();
+            }
+            mEnv->PopLocalFrame(NULL);
+        }
+
+    private:
+
+        JNIEnv *mEnv;
+        std::vector<jvalue> &mRefs;
+    };
+
+
 	inline void release_object (value inValue) {
 		
 		if (val_is_kind (inValue, gObjectKind)) {
@@ -979,7 +1009,8 @@ namespace lime {
 				}
 	
 	
-	bool HaxeToJNI (JNIEnv *inEnv, value inValue, JNIType inType, jvalue &out) {
+     bool HaxeToJNI (JNIEnv *inEnv, value inValue, JNIType inType, jvalue &out,
+                     std::vector<jvalue> &jargs_refs) {
 		
 		if (inType.isUnknown ()) {
 			
@@ -1002,12 +1033,14 @@ namespace lime {
 			for (int i = 0; i < len; i++) {
 				
 				jvalue elem_i;
-				HaxeToJNI (inEnv, val_array_i (inValue, i), etype, elem_i);
+				HaxeToJNI (inEnv, val_array_i (inValue, i), etype, elem_i,
+                           jargs_refs);
 				inEnv->SetObjectArrayElement (arr, i, elem_i.l);
 				
 			}
 			
 			out.l = arr;
+            jargs_refs.push_back(out);
 			return true;
 			
 		} else if (inType.arrayDepth == 1) {
@@ -1045,6 +1078,7 @@ namespace lime {
 					}
 					
 					out.l = arr;
+                    jargs_refs.push_back(out);
 					return true;
 				}
 				
@@ -1064,11 +1098,13 @@ namespace lime {
 				case jniObjectString:
 				{
 					out.l = inEnv->NewStringUTF (val_string (inValue));
+                    jargs_refs.push_back(out);
 					return true;
 				}
 				case jniObjectHaxe:
 					
 					out.l = CreateJavaHaxeObjectRef(inEnv,inValue);
+                    jargs_refs.push_back(out);
 					return true;
 				
 				case jniObject:
@@ -1080,6 +1116,7 @@ namespace lime {
 						if (val_is_string (inValue)) {
 							
 							out.l = inEnv->NewStringUTF (val_string (inValue));
+                            jargs_refs.push_back(out);
 							return true;
 							
 						}
@@ -1090,6 +1127,7 @@ namespace lime {
 					}
 					
 					out.l = obj;
+                    jargs_refs.push_back(out);
 					return true;
 				}
 				case jniBoolean: out.z = (bool)val_number (inValue); return true;
@@ -1246,9 +1284,10 @@ namespace lime {
 			
 			JNIEnv *env = (JNIEnv*)JNI::GetEnv ();
 			jvalue setValue;
-			
-			if (!HaxeToJNI (env, inValue, mFieldType, setValue)) {
-				
+            std::vector<jvalue> jargs_refs;
+            RefCleaner refCleaner(env, jargs_refs);
+            
+			if (!HaxeToJNI (env, inValue, mFieldType, setValue, jargs_refs)) {
 				ELOG ("SetStatic - bad value");
 				return;
 				
@@ -1378,9 +1417,11 @@ namespace lime {
 			
 			JNIEnv *env = (JNIEnv*)JNI::GetEnv ();
 			jvalue setValue;
-			
-			if (!HaxeToJNI (env, inValue, mFieldType, setValue)) {
-				
+            std::vector<jvalue> jargs_refs;
+            RefCleaner refCleaner(env, jargs_refs);
+            
+			if (!HaxeToJNI (env, inValue, mFieldType, setValue, jargs_refs)) {
+
 				ELOG ("SetMember - bad value");
 				return;
 				
@@ -1560,9 +1601,6 @@ namespace lime {
 	struct JNIMethod : public lime::Object {
 		
 		
-		enum { MAX = 20 };
-		
-		
 		JNIMethod (HxString inClass, HxString inMethod, HxString inSignature, bool inStatic, bool inQuiet) {
 			
 			JNIEnv *env = (JNIEnv*)JNI::GetEnv ();
@@ -1633,7 +1671,8 @@ namespace lime {
 		}
 		
 		
-		bool HaxeToJNIArgs (JNIEnv *inEnv, value inArray, jvalue *outValues) {
+		bool HaxeToJNIArgs (JNIEnv *inEnv, value inArray, jvalue *outValues,
+                            std::vector<jvalue> &jargs_refs) {
 			
 			if (val_array_size (inArray) != mArgCount) {
 				
@@ -1646,8 +1685,8 @@ namespace lime {
 				
 				value arg_i = val_array_i (inArray, i);
 				
-				if (!HaxeToJNI (inEnv, arg_i, mArgType[i], outValues[i])) {
-					
+				if (!HaxeToJNI (inEnv, arg_i, mArgType[i], outValues[i],
+                                jargs_refs)) {
 					ELOG ("HaxeToJNI could not convert param %d (%p) to %dx%d", i, arg_i, mArgType[i].element, mArgType[i].arrayDepth);
 					return false;
 					
@@ -1679,7 +1718,7 @@ namespace lime {
 			
 			while (*inSig != ')') {
 				
-				if (mArgCount == MAX) {
+				if (mArgCount == MAX_LOCALS) {
 					
 					return false;
 					
@@ -1715,11 +1754,12 @@ namespace lime {
 		value CallStatic (value inArgs) {
 			
 			JNIEnv *env = (JNIEnv*)JNI::GetEnv ();
-			env->PushLocalFrame(128);
-			jvalue jargs[MAX];
+			jvalue jargs[MAX_LOCALS];
+            std::vector<jvalue> jargs_refs;
+            RefCleaner refCleanear(env, jargs_refs);
 			
-			if (!HaxeToJNIArgs (env, inArgs, jargs)) {
-				
+			if (!HaxeToJNIArgs (env, inArgs, jargs, jargs_refs)) {
+
 				CleanStringArgs ();
 				ELOG ("CallStatic - bad argument list");
 				return alloc_null ();
@@ -1792,8 +1832,7 @@ namespace lime {
 			}
 			
 			CleanStringArgs ();
-			CheckException (env);
-			env->PopLocalFrame(NULL);
+			CheckException (env, true);
 			return result;
 			
 		}
@@ -1802,9 +1841,11 @@ namespace lime {
 		value CallMember (jobject inObject, value inArgs) {
 			
 			JNIEnv *env = (JNIEnv*)JNI::GetEnv ();
-			jvalue jargs[MAX];
+			jvalue jargs[MAX_LOCALS];
+            std::vector<jvalue> jargs_refs;
+            RefCleaner refCleaner(env, jargs_refs);
 			
-			if (!HaxeToJNIArgs (env, inArgs, jargs)) {
+			if (!HaxeToJNIArgs (env, inArgs, jargs, jargs_refs)) {
 				
 				CleanStringArgs ();
 				ELOG ("CallMember - bad argument list");
@@ -1881,7 +1922,7 @@ namespace lime {
 		jclass mClass;
 		jmethodID mMethod;
 		JNIType mReturn;
-		JNIType mArgType[MAX];
+		JNIType mArgType[MAX_LOCALS];
 		int mArgCount;
 		bool mIsConstructor;
 		

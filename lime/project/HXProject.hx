@@ -50,6 +50,8 @@ class HXProject {
 	public var libraryHandlers:Map <String, String>;
 	public var meta:MetaData;
 	public var ndlls:Array <NDLL>;
+    // ndlls that are installed, but not auto-loaded at application startup
+    public var libs:Array <NDLL>;
 	public var platformType:PlatformType;
 	public var samplePaths:Array <String>;
 	public var sources:Array <String>;
@@ -217,6 +219,7 @@ class HXProject {
 		libraries = new Array <Library> ();
 		libraryHandlers = new Map <String, String> ();
 		ndlls = new Array <NDLL> ();
+		libs = new Array <NDLL> ();
 		sources = new Array <String> ();
 		samplePaths = new Array <String> ();
 		splashScreens = new Array <SplashScreen> ();
@@ -309,6 +312,12 @@ class HXProject {
 			
 		}
 		
+		for (lib in libs) {
+			
+			project.libs.push (lib.clone ());
+			
+		}
+
 		project.platformType = platformType;
 		project.samplePaths = samplePaths.copy ();
 		project.sources = sources.copy ();
@@ -714,6 +723,7 @@ class HXProject {
 			javaPaths = ArrayHelper.concatUnique (javaPaths, project.javaPaths, true);
 			libraries = ArrayHelper.concatUnique (libraries, project.libraries, true);
 			ndlls = ArrayHelper.concatUnique (ndlls, project.ndlls);
+			libs = ArrayHelper.concatUnique (libs, project.libs);
 			samplePaths = ArrayHelper.concatUnique (samplePaths, project.samplePaths, true);
 			sources = ArrayHelper.concatUnique (sources, project.sources, true);
 			splashScreens = ArrayHelper.concatUnique (splashScreens, project.splashScreens);
@@ -764,6 +774,16 @@ class HXProject {
 					
 				}
 				
+				for (lib in includeProject.libs) {
+					
+					if (lib.haxelib == null) {
+						
+						lib.haxelib = haxelib;
+						
+					}
+					
+				}
+                
 				project.merge (includeProject);
 				
 			}
