@@ -15,27 +15,22 @@ HAXELIB_NAME := lime
 # doesn't need one to be generated
 SUPPRESS_HAXELIB_JSON := 1
 
-TARGETS += BuildRunScript BuildTools
 PRE_BOM_TARGETS += BuildRunScript BuildTools
 
 ifeq ($(HAXE_BUILD_TARGET),android)
-TARGETS += BuildLibs BuildNative
 PRE_BOM_TARGETS += BuildLibs BuildNative
 endif
 
 ifeq ($(HAXE_BUILD_TARGET),ios)
-TARGETS += BuildLibs BuildNative
 PRE_BOM_TARGETS += BuildLibs BuildNative
 endif
 
 ifeq ($(HAXE_BUILD_TARGET),tvos)
-TARGETS += BuildLibs BuildNative
 PRE_BOM_TARGETS += BuildLibs BuildNative
 endif
 
 ifeq ($(HAXE_TARGET_SYSTEM),host)
-TARGETS += BuildLibs BuildNative
-PRE_BOM_TARGETS += BuildLibs BuildNative
+PRE_BOM_TARGETS += BuildLibs
 endif
 
 # We don't use the standard lime flags here because we are trying to
@@ -53,6 +48,11 @@ endif
 # the current directory, and because of the way relative paths are used in
 # its build scripts, deep staging is required
 DEEP_STAGING_REQUIRED = 1
+
+# Ensure that we don't try to build the BuildLibs and BuildNative
+# targets simultaneously.
+BUILDLIBSTAMP = $(OBJDIR)/.buildlib
+
 
 include $(ISMRULES)
 
@@ -74,14 +74,16 @@ $(HAXELIB_STAGED_DIR)/tools/tools.n: $(STAGE_HAXELIB_TARGET) tools/tools.hxml
 	  $(HAXE) tools.hxml
 
 .PHONY: BuildLibs
-BuildLibs: $(HAXELIB_STAGED_DIR)/run.n $(HAXELIB_STAGED_DIR)/tools/tools.n
+BuildLibs: $(BUILDLIBSTAMP)
+$(BUILDLIBSTAMP): $(HAXELIB_STAGED_DIR)/run.n $(HAXELIB_STAGED_DIR)/tools/tools.n
 	@$(ECHO) -n "$(ISMCOLOR)$(ISM_NAME)$(UNCOLOR): "; \
 	$(ECHO) "$(COLOR)Rebuilding Lime libraries for $(HAXE_HOST_SYSTEM)$(UNCOLOR)";
 	$(Q) cd $(HAXELIB_STAGED_DIR); \
-	  neko run.n rebuild $(HAXE_HOST_SYSTEM) $(ARGS)
+	  neko run.n rebuild $(HAXE_HOST_SYSTEM) $(ARGS) && \
+	  touch $(BUILDLIBSTAMP)
 
 .PHONY: BuildNative
-BuildNative: $(HAXELIB_STAGED_DIR)/run.n $(HAXELIB_STAGED_DIR)/tools/tools.n
+BuildNative: $(HAXELIB_STAGED_DIR)/run.n $(HAXELIB_STAGED_DIR)/tools/tools.n $(BUILDLIBSTAMP)
 	@$(ECHO) -n "$(ISMCOLOR)$(ISM_NAME)$(UNCOLOR): "; \
 	$(ECHO) "$(COLOR)Rebuilding Lime libraries for $(HAXE_BUILD_TARGET)$(UNCOLOR)";
 	$(Q) cd $(HAXELIB_STAGED_DIR); \

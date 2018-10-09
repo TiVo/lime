@@ -6,8 +6,11 @@
 #include <pthread.h>
 #include <android/log.h>
 #include <SDL.h>
+#include <list>
 #include <map>
+#include <signal.h>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
 #define ELOG(args...) __android_log_print (ANDROID_LOG_ERROR, "Lime", args)
@@ -18,6 +21,16 @@
 #define JAVA_EXPORT JNIEXPORT
 #endif
 
+// This is a list of jlong values (and a lock for serializing access to it)
+// that holds the jlong's passed to the
+// Java_org_haxe_lime_Lime_releaseReference function by a Java VM finalizer
+// thread.  Instead of immediately operating on these in that thread (which
+// can cause deadlocks that crash the VM), just store them in this list, to be
+// acted on later (in the create ref function).  This allows all other locking
+// and lifecycle management to be done only from the haxe side thread, which
+// is safer and avoids the deadlocks.
+static pthread_mutex_t g_releaseRef_list_lock = PTHREAD_MUTEX_INITIALIZER;
+static std::list<jlong> g_releaseRef_list;
 
 namespace lime {
 	
@@ -532,42 +545,6 @@ namespace lime {
 	pthread_mutex_t gJavaObjectsMutex;
 	
 	
-	jobject CreateJavaHaxeObjectRef (JNIEnv *env, value inValue) {
-		
-		JNIInit (env);
-		
-		if (!gJavaObjectsMutexInit) {
-			
-			gJavaObjectsMutexInit = false;
-            // Use recursive mutex to avoid deadlocks
-            gJavaObjectsMutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
-			
-		}
-		
-		pthread_mutex_lock (&gJavaObjectsMutex);
-		JavaHaxeReferenceMap::iterator it = gJavaObjects.find (inValue);
-		
-		if (it != gJavaObjects.end ()) {
-			
-			it->second->refCount++;
-			
-		} else {
-			
-			gJavaObjects[inValue] = new JavaHaxeReference (inValue);
-			
-		}
-		
-		pthread_mutex_unlock (&gJavaObjectsMutex);
-		
-		jobject result = env->CallStaticObjectMethod (HaxeObject, HaxeObject_create, (jlong)inValue);
-		jthrowable exc = env->ExceptionOccurred ();
-		CheckException (env);
-		
-		return result;
-		
-	}
-	
-	
 	void RemoveJavaHaxeObjectRef (value inValue) {
 		
 		pthread_mutex_lock (&gJavaObjectsMutex);
@@ -592,6 +569,59 @@ namespace lime {
 		}
 		
 		pthread_mutex_unlock (&gJavaObjectsMutex);
+		
+	}
+	
+	
+	jobject CreateJavaHaxeObjectRef (JNIEnv *env, value inValue) {
+		
+		JNIInit (env);
+		
+		if (!gJavaObjectsMutexInit) {
+			
+			gJavaObjectsMutexInit = false;
+            // Use recursive mutex to avoid deadlocks
+            gJavaObjectsMutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+			
+		}
+		
+        // Clean up any references that need to be released.  Latch the
+        // list locally so as not to hold up the releaseReference caller.
+        pthread_mutex_lock(&g_releaseRef_list_lock);
+        std::list<jlong> releaseRefs(g_releaseRef_list.begin(),
+                                     g_releaseRef_list.end());
+        g_releaseRef_list.clear();
+        pthread_mutex_unlock(&g_releaseRef_list_lock);
+
+        {
+            lime::AutoHaxe haxe ("releaseReference");
+            for (std::list<jlong>::iterator it = releaseRefs.begin();
+                 it != releaseRefs.end(); it++) {
+                value val = (value) *it;
+                RemoveJavaHaxeObjectRef(val);
+            }
+        }
+			
+		pthread_mutex_lock (&gJavaObjectsMutex);
+		JavaHaxeReferenceMap::iterator it = gJavaObjects.find (inValue);
+		
+		if (it != gJavaObjects.end ()) {
+			
+			it->second->refCount++;
+			
+		} else {
+			
+			gJavaObjects[inValue] = new JavaHaxeReference (inValue);
+			
+		}
+		
+		pthread_mutex_unlock (&gJavaObjectsMutex);
+		
+		jobject result = env->CallStaticObjectMethod (HaxeObject, HaxeObject_create, (jlong)inValue);
+		jthrowable exc = env->ExceptionOccurred ();
+		CheckException (env);
+		
+		return result;
 		
 	}
 	
@@ -2066,15 +2096,17 @@ extern "C" {
 		delete root;
 		
 	}
-	
-	
+
 	JAVA_EXPORT jobject JNICALL Java_org_haxe_lime_Lime_releaseReference (JNIEnv * env, jobject obj, jlong handle) {
-		
-		lime::AutoHaxe haxe ("releaseReference");
-		value val = (value)handle;
-		lime::RemoveJavaHaxeObjectRef (val);
+
+        // In order to avoid deadlocks and other problems, defer the actual
+        // call to releasing the reference to happen when the next
+        // CreateJavaHaxeObjectRef occurs
+        pthread_mutex_lock(&g_releaseRef_list_lock);
+        g_releaseRef_list.push_back(handle);
+        pthread_mutex_unlock(&g_releaseRef_list_lock);
+        
 		return 0;
-		
 	}
 	
 	

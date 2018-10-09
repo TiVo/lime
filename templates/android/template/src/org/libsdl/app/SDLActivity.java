@@ -12,6 +12,7 @@ import java.lang.reflect.Method;
 
 import android.app.*;
 import android.content.*;
+import android.content.BroadcastReceiver;
 import android.text.InputType;
 import android.view.*;
 import android.view.accessibility.AccessibilityManager; 
@@ -34,6 +35,7 @@ import android.graphics.drawable.Drawable;
 import android.media.*;
 import android.hardware.*;
 import android.content.pm.ActivityInfo;
+import android.content.IntentFilter;
 
 import org.haxe.HXCPP;
 
@@ -61,6 +63,7 @@ public class SDLActivity extends Activity {
     protected static View mTextEdit;
     protected static ViewGroup mLayout;
     protected static SDLJoystickHandler mJoystickHandler;
+    protected static AOBroadcastReceiver mAOBroadcastReceiver;
 
     // This is what SDL runs in. It invokes SDL_main(), eventually
     protected static Thread mSDLThread;
@@ -70,6 +73,7 @@ public class SDLActivity extends Activity {
     protected static AudioRecord mAudioRecord;
 
     private boolean isAppPaused;
+    private Intent intentWhilePaused;
 
     //VirtualNavigation keys when Talk back is turned on
     private static VirtualDpadKey mCenterVirtualDpadKey;
@@ -146,6 +150,7 @@ public class SDLActivity extends Activity {
         mDownVirtualDpadKey = null;
         mIsTalkbackEnabled = false;
         mOnPauseFocusedView = null;
+		mAOBroadcastReceiver = null;
     }
 
     // Setup
@@ -237,7 +242,7 @@ public class SDLActivity extends Activity {
         }
 
         mLayout = new SDLAbsoluteLayout(this, mSurface);
-      
+
         setContentView(mLayout);
         
         // Get filename from "Open with" of another application
@@ -252,15 +257,140 @@ public class SDLActivity extends Activity {
         }
     }
 
+    @Override
+    protected void onStart()
+    {
+        Log.v(TAG, "onStart()");
+        super.onStart();     
+
+        this.registerAOBroadcastReceiverIfNecessary();
+    }
+
     protected void onNewIntent(Intent intent)
     {
-        // Turn Intents known to be the result of remote key presses
-        // back into those key presses.  But not when paused, because we don't
-        // handle key presses while paused.
+        Log.v(TAG, "onNewIntent(): " + intent.toUri(0));
+
+        // If app is paused, don't handle the new intent immediately --
+        // instead wait until a delay after the app is resumed
         if (isAppPaused) {
+            this.intentWhilePaused = intent;
+        }
+        else {
+            handleNewIntent(intent);
+        }
+    }
+
+    // Events -- when Android calls onStop, the app is actually going into the
+    // background.  This is considered to be a "pause" for our purposes.  The
+    // Android onPause() is not used for this as it actually does not bound
+    // the scope of a background/foreground cycle (Android 'pause' is just a
+    // transient state that may not involve actually going to the background)
+    @Override
+    protected void onPause()
+    {
+        Log.v(TAG, "onPause()");
+        super.onPause();
+        isAppPaused = true;
+        if (SDLActivity.mBrokenLibraries) {
+           return;
+        }
+
+        mOnPauseFocusedView = null;
+
+        if (mLayout != null) {
+            for (int i = 0; i < mLayout.getChildCount(); i++) {
+                if (mLayout.getChildAt(i).hasFocus()) {
+                    mOnPauseFocusedView = mLayout.getChildAt(i);
+                }
+            }
+        }
+
+        // Assume paused activities do not have focus
+        SDLActivity.mHasFocus = false;
+        SDLActivity.handlePause();
+    }
+
+    @Override
+    protected void onStop()
+    {
+        Log.v(TAG, "onStop()");
+        super.onStop();
+        if (SDLActivity.mBrokenLibraries) {
             return;
         }
 
+        if (mAOBroadcastReceiver != null) {
+		    unregisterReceiver(mAOBroadcastReceiver);
+            mAOBroadcastReceiver = null;
+        }
+    }
+
+    @Override
+    protected void onRestart()
+    {
+        Log.v(TAG, "onRestart()");
+        super.onRestart();
+        this.registerAOBroadcastReceiverIfNecessary();
+    }
+
+    // Android onResume is called when returning to the foreground, which we
+    // consider to be the termination of a "pause" state
+    @Override
+    protected void onResume()
+    {
+        Log.v(TAG, "onResume()");
+        super.onResume();
+        isAppPaused = false;
+        if (SDLActivity.mBrokenLibraries) {
+           return;
+        }
+
+        // Assume resumed apps always have focus
+        SDLActivity.mHasFocus = true;
+        SDLActivity.handleResume();
+        setTalkbackState();
+        if (shouldEnableVirtualNavigation()) {
+            enableVirtualNavigation();
+        } else {
+            disableVirtualNavigation();
+        }
+        
+        final View onPauseFocusedView = mOnPauseFocusedView;
+        if (onPauseFocusedView != null) {
+            // Must delay requesting focus or else Android doesn't always
+            // assign focus, 100 ms is magic!
+            // Latch the intent which may be delivered as well
+            final Intent intent = this.intentWhilePaused;
+            this.intentWhilePaused = null;
+            mVirtualNavigationFocusHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        onPauseFocusedView.requestFocus();
+                        // Now that focus is achieved, handle any deferred
+                        // intent whose effect will be to deliver a simulated
+                        // key press
+                        if (intent != null) {
+                            handleNewIntent(intent);
+                        }
+                    }
+                }, 100);
+        }    
+    }
+
+    private void registerAOBroadcastReceiverIfNecessary()
+    {
+        if (mAOBroadcastReceiver == null)
+        {
+            mAOBroadcastReceiver = new AOBroadcastReceiver();
+
+            IntentFilter filter = new IntentFilter("accessibilityOptionsEvent");
+            registerReceiver(mAOBroadcastReceiver, filter);
+        }
+    }
+    
+    private void handleNewIntent(Intent intent)
+    {
+        // Turn Intents known to be the result of remote key presses
         String action = intent.getAction();
         if (action == null) {
             return;
@@ -276,67 +406,29 @@ public class SDLActivity extends Activity {
             SDLActivity.onNativeKeyDown(284);
             SDLActivity.onNativeKeyUp(284);
         }
-    }
-
-    // Events -- when Android calls onStop, the app is actually going into the
-    // background.  This is considered to be a "pause" for our purposes.  The
-    // Android onPause() is not used for this as it actually does not bound
-    // the scope of a background/foreground cycle (Android 'pause' is just a
-    // transient state that may not involve actually going to the background)
-    @Override
-    protected void onStop() {
-        Log.v(TAG, "onStop()");
-        super.onStop();
-        isAppPaused = true;
-        if (SDLActivity.mBrokenLibraries) {
-           return;
+        // Special TiVO-only intents
+        else if (action.equals("com.tivo.exit")) {
+            // Deliver an exit key press, which on Android platforms is
+            // accomplished with F10, which openfl maps to EXIT
+            SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_F10);
+            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_F10);
         }
-
-        mOnPauseFocusedView = null;
-        if (mLayout != null) {
-            for (int i = 0; i < mLayout.getChildCount(); i++) {
-                if (mLayout.getChildAt(i).hasFocus()) {
-                    mOnPauseFocusedView = mLayout.getChildAt(i);
-                }
-            }
+        else if (action.equals("com.tivo.guide")) {
+            // Deliver a guide key press
+            SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_GUIDE);
+            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_GUIDE);
         }
-
-        // Assume paused activities do not have focus
-        SDLActivity.mHasFocus = false;
-        SDLActivity.handlePause();
-    }
-
-    // Android onRestart is called when returning to the foreground, which we
-    // consider to be the termination of a "pause" state
-    @Override
-    protected void onRestart() {
-        Log.v(TAG, "onRestart()");
-        super.onRestart();
-        isAppPaused = false;
-        if (SDLActivity.mBrokenLibraries) {
-           return;
+        else if (action.equals("com.tivo.vod")) {
+            // Deliver a VOD key press, which on Android platforms is
+            // accomplished with F9, which openfl maps to VOD
+            SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_F9);
+            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_F9);
         }
-
-        // Assume resumed apps always have focus
-        SDLActivity.mHasFocus = true;
-        SDLActivity.handleResume();
-        setTalkbackState();
-        if (shouldEnableVirtualNavigation()) {
-            enableVirtualNavigation();
-        } else {
-            disableVirtualNavigation();
+        else if (action.equals("com.tivo.voice")) {
+            // Deliver a SEARCH key press
+            SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_SEARCH);
+            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_SEARCH);
         }
-        final View onPauseFocusedView = mOnPauseFocusedView;
-        if (onPauseFocusedView != null) {
-            // Must delay requesting focus or else Android doesn't always
-            // assign focus, 100 ms is magic!
-            mVirtualNavigationFocusHandler.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        onPauseFocusedView.requestFocus();
-                    }
-                }, 100);
-        }    
     }
 
     @Override
@@ -505,6 +597,22 @@ public class SDLActivity extends Activity {
         DOWN
     }
 
+    private class AOBroadcastReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // Get extra data included in the Intent
+            String state = intent.getStringExtra("state");
+
+            setTalkbackState();
+
+            if(state.equals("enable")) {
+                enableVirtualNavigation();
+            }else if(state.equals("disable")) {
+                disableVirtualNavigation();
+            }
+        }
+    }
+
     private class VirtualDpadKey extends Button {
     
         private final VirtualDpadKeyType mVirtualDpadKeyType;
@@ -662,7 +770,10 @@ public class SDLActivity extends Activity {
     /* The native thread has finished */
     public static void handleNativeExit() {
         SDLActivity.mSDLThread = null;
-        mSingleton.finish();
+        // Simply exit the Java VM, because the native thread exiting is not
+        // an expected condition and there is no way to recover from this.  On
+        // exiting the VM, Android will re-start the app gracefully.
+        System.exit(-1);
     }
 
 
@@ -1380,7 +1491,7 @@ class SDLMain implements Runnable {
         SDLActivity.nativeInit(SDLActivity.mSingleton.getArguments());
 
         HXCPP.run ("ApplicationMain");
-        //Log.v("SDL", "SDL thread terminated");
+        Log.e("SDL", "Native thread exited unexpectedly");
     }
 }
 
