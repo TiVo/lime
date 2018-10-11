@@ -3,6 +3,7 @@ package lime.app;
 
 import lime.graphics.Renderer;
 import lime.graphics.RenderContext;
+import lime.system.System;
 import lime.ui.Gamepad;
 import lime.ui.GamepadAxis;
 import lime.ui.GamepadButton;
@@ -12,6 +13,11 @@ import lime.ui.KeyCode;
 import lime.ui.KeyModifier;
 import lime.ui.Touch;
 import lime.ui.Window;
+
+#if !lime_debug
+@:fileXml('tags="haxe,release"')
+@:noDebug
+#end
 
 
 /** 
@@ -191,7 +197,7 @@ class Application extends Module {
 		}
 		
 		window.create (this);
-		__windows.push (window);
+		//__windows.push (window);
 		windowByID.set (window.id, window);
 		
 		window.onCreate.dispatch ();
@@ -265,9 +271,21 @@ class Application extends Module {
 			windowByID.remove (window.id);
 			window.close ();
 			
+			if (window.renderer != null) {
+				
+				removeRenderer (window.renderer);
+				
+			}
+			
 			if (this.window == window) {
 				
 				this.window = null;
+				
+			}
+			
+			if (__windows.length == 0) {
+				
+				System.exit (0);
 				
 			}
 			

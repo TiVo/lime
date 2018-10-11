@@ -1,6 +1,7 @@
 package lime._backend.native;
 
 
+import lime._backend.native.NativeCFFI;
 import lime.app.Application;
 import lime.graphics.Image;
 import lime.graphics.ImageBuffer;
@@ -9,10 +10,12 @@ import lime.system.Display;
 import lime.system.System;
 import lime.ui.Window;
 
-#if !macro
-@:build(lime.system.CFFI.build())
+#if !lime_debug
+@:fileXml('tags="haxe,release"')
+@:noDebug
 #end
 
+@:access(lime._backend.native.NativeCFFI)
 @:access(lime.app.Application)
 @:access(lime.ui.Window)
 
@@ -22,6 +25,7 @@ class NativeWindow {
 	
 	public var handle:Dynamic;
 	
+	private var closing:Bool;
 	private var parent:Window;
 	
 	
@@ -37,7 +41,7 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			lime_window_alert (handle, message, title);
+			NativeCFFI.lime_window_alert (handle, message, title);
 			#end
 			
 		}
@@ -47,20 +51,31 @@ class NativeWindow {
 	
 	public function close ():Void {
 		
-		parent.onClose.dispatch ();
-		
-		if (!parent.onClose.canceled) {
+		if (!closing) {
 			
-			if (handle != null) {
+			closing = true;
+			parent.onClose.dispatch ();
+			
+			if (!parent.onClose.canceled) {
 				
-				#if !macro
-				lime_window_close (handle);
-				#end
-				handle = null;
+				if (handle != null) {
+					
+					#if !macro
+					NativeCFFI.lime_window_close (handle);
+					#end
+					handle = null;
+					
+				}
+				
+			} else {
+				
+				closing = false;
 				
 			}
 			
 		}
+		
+		
 		
 	}
 	
@@ -90,7 +105,10 @@ class NativeWindow {
 			if (Reflect.hasField (parent.config, "borderless") && parent.config.borderless) flags |= cast WindowFlags.WINDOW_FLAG_BORDERLESS;
 			if (Reflect.hasField (parent.config, "depthBuffer") && parent.config.depthBuffer) flags |= cast WindowFlags.WINDOW_FLAG_DEPTH_BUFFER;
 			if (Reflect.hasField (parent.config, "fullscreen") && parent.config.fullscreen) flags |= cast WindowFlags.WINDOW_FLAG_FULLSCREEN;
-			if (Reflect.hasField (parent.config, "hardware") && parent.config.hardware) flags |= cast WindowFlags.WINDOW_FLAG_HARDWARE;
+			#if !cairo if (Reflect.hasField (parent.config, "hardware") && parent.config.hardware) flags |= cast WindowFlags.WINDOW_FLAG_HARDWARE; #end
+			if (Reflect.hasField (parent.config, "hidden") && parent.config.hidden) flags |= cast WindowFlags.WINDOW_FLAG_HIDDEN;
+			if (Reflect.hasField (parent.config, "maximized") && parent.config.maximized) flags |= cast WindowFlags.WINDOW_FLAG_MAXIMIZED;
+			if (Reflect.hasField (parent.config, "minimized") && parent.config.minimized) flags |= cast WindowFlags.WINDOW_FLAG_MINIMIZED;
 			if (Reflect.hasField (parent.config, "resizable") && parent.config.resizable) flags |= cast WindowFlags.WINDOW_FLAG_RESIZABLE;
 			if (Reflect.hasField (parent.config, "stencilBuffer") && parent.config.stencilBuffer) flags |= cast WindowFlags.WINDOW_FLAG_STENCIL_BUFFER;
 			if (Reflect.hasField (parent.config, "vsync") && parent.config.vsync) flags |= cast WindowFlags.WINDOW_FLAG_VSYNC;
@@ -104,15 +122,15 @@ class NativeWindow {
 		}
 		
 		#if !macro
-		handle = lime_window_create (application.backend.handle, parent.width, parent.height, flags, title);
+		handle = NativeCFFI.lime_window_create (application.backend.handle, parent.width, parent.height, flags, title);
 		
 		if (handle != null) {
 			
-			parent.__width = lime_window_get_width (handle);
-			parent.__height = lime_window_get_height (handle);
-			parent.__x = lime_window_get_x (handle);
-			parent.__y = lime_window_get_y (handle);
-			parent.id = lime_window_get_id (handle);
+			parent.__width = NativeCFFI.lime_window_get_width (handle);
+			parent.__height = NativeCFFI.lime_window_get_height (handle);
+			parent.__x = NativeCFFI.lime_window_get_x (handle);
+			parent.__y = NativeCFFI.lime_window_get_y (handle);
+			parent.id = NativeCFFI.lime_window_get_id (handle);
 			
 		}
 		#end
@@ -125,7 +143,7 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			lime_window_focus (handle);
+			NativeCFFI.lime_window_focus (handle);
 			#end
 			
 		}
@@ -137,13 +155,15 @@ class NativeWindow {
 		
 		if (handle != null) {
 			
-			var index = lime_window_get_display (handle);
+			#if !macro
+			var index = NativeCFFI.lime_window_get_display (handle);
 			
 			if (index > -1) {
 				
 				return System.getDisplay (index);
 				
 			}
+			#end
 			
 		}
 		
@@ -157,7 +177,7 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			return lime_window_get_enable_text_events (handle);
+			return NativeCFFI.lime_window_get_enable_text_events (handle);
 			#end
 			
 		}
@@ -172,7 +192,7 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			lime_window_move (handle, x, y);
+			NativeCFFI.lime_window_move (handle, x, y);
 			#end
 			
 		}
@@ -185,7 +205,7 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			lime_window_resize (handle, width, height);
+			NativeCFFI.lime_window_resize (handle, width, height);
 			#end
 			
 		}
@@ -198,7 +218,7 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			lime_window_set_borderless (handle, value);
+			NativeCFFI.lime_window_set_borderless (handle, value);
 			#end
 			
 		}
@@ -212,7 +232,7 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			lime_window_set_enable_text_events (handle, value);
+			NativeCFFI.lime_window_set_enable_text_events (handle, value);
 			#end
 			
 		}
@@ -227,13 +247,13 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			value = lime_window_set_fullscreen (handle, value);
-			#end
+			value = NativeCFFI.lime_window_set_fullscreen (handle, value);
 			
-			parent.__width = lime_window_get_width (handle);
-			parent.__height = lime_window_get_height (handle);
-			parent.__x = lime_window_get_x (handle);
-			parent.__y = lime_window_get_y (handle);
+			parent.__width = NativeCFFI.lime_window_get_width (handle);
+			parent.__height = NativeCFFI.lime_window_get_height (handle);
+			parent.__x = NativeCFFI.lime_window_get_x (handle);
+			parent.__y = NativeCFFI.lime_window_get_y (handle);
+			#end
 			
 			if (value) {
 				
@@ -253,7 +273,7 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			lime_window_set_icon (handle, image.buffer);
+			NativeCFFI.lime_window_set_icon (handle, image.buffer);
 			#end
 			
 		}
@@ -266,7 +286,7 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			return lime_window_set_maximized (handle, value);
+			return NativeCFFI.lime_window_set_maximized (handle, value);
 			#end
 			
 		}
@@ -281,7 +301,7 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			return lime_window_set_minimized (handle, value);
+			return NativeCFFI.lime_window_set_minimized (handle, value);
 			#end
 			
 		}
@@ -296,12 +316,12 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			lime_window_set_resizable (handle, value);
+			NativeCFFI.lime_window_set_resizable (handle, value);
 			
 			// TODO: remove need for workaround
 			
-			lime_window_set_borderless (handle, !parent.__borderless);
-			lime_window_set_borderless (handle, parent.__borderless);
+			NativeCFFI.lime_window_set_borderless (handle, !parent.__borderless);
+			NativeCFFI.lime_window_set_borderless (handle, parent.__borderless);
 			#end
 			
 		}
@@ -315,7 +335,7 @@ class NativeWindow {
 		if (handle != null) {
 			
 			#if !macro
-			return lime_window_set_title (handle, value);
+			return NativeCFFI.lime_window_set_title (handle, value);
 			#end
 			
 		}
@@ -323,31 +343,6 @@ class NativeWindow {
 		return value;
 		
 	}
-	
-	
-	#if !macro
-	@:cffi private static function lime_window_alert (handle:Dynamic, message:String, title:String):Void;
-	@:cffi private static function lime_window_close (handle:Dynamic):Void;
-	@:cffi private static function lime_window_create (application:Dynamic, width:Int, height:Int, flags:Int, title:String):Dynamic;
-	@:cffi private static function lime_window_focus (handle:Dynamic):Void;
-	@:cffi private static function lime_window_get_display (handle:Dynamic):Int;
-	@:cffi private static function lime_window_get_enable_text_events (handle:Dynamic):Bool;
-	@:cffi private static function lime_window_get_height (handle:Dynamic):Int;
-	@:cffi private static function lime_window_get_id (handle:Dynamic):Int;
-	@:cffi private static function lime_window_get_width (handle:Dynamic):Int;
-	@:cffi private static function lime_window_get_x (handle:Dynamic):Int;
-	@:cffi private static function lime_window_get_y (handle:Dynamic):Int;
-	@:cffi private static function lime_window_move (handle:Dynamic, x:Int, y:Int):Void;
-	@:cffi private static function lime_window_resize (handle:Dynamic, width:Int, height:Int):Void;
-	@:cffi private static function lime_window_set_borderless (handle:Dynamic, borderless:Bool):Bool;
-	@:cffi private static function lime_window_set_enable_text_events (handle:Dynamic, enabled:Bool):Void;
-	@:cffi private static function lime_window_set_fullscreen (handle:Dynamic, fullscreen:Bool):Bool;
-	@:cffi private static function lime_window_set_icon (handle:Dynamic, buffer:Dynamic):Void;
-	@:cffi private static function lime_window_set_maximized (handle:Dynamic, maximized:Bool):Bool;
-	@:cffi private static function lime_window_set_minimized (handle:Dynamic, minimized:Bool):Bool;
-	@:cffi private static function lime_window_set_resizable (handle:Dynamic, resizable:Bool):Bool;
-	@:cffi private static function lime_window_set_title (handle:Dynamic, title:String):Dynamic;
-	#end
 	
 	
 }
@@ -367,5 +362,8 @@ class NativeWindow {
 	var WINDOW_FLAG_DEPTH_BUFFER = 0x00000200;
 	var WINDOW_FLAG_STENCIL_BUFFER = 0x00000400;
 	var WINDOW_FLAG_ALLOW_HIGHDPI = 0x00000800;
+	var WINDOW_FLAG_HIDDEN = 0x00001000;
+	var WINDOW_FLAG_MINIMIZED = 0x00002000;
+	var WINDOW_FLAG_MAXIMIZED = 0x00004000;
 	
 }

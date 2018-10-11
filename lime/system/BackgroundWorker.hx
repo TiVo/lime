@@ -18,6 +18,11 @@ import neko.vm.Thread;
 #end
 #end
 
+#if !lime_debug
+@:fileXml('tags="haxe,release"')
+@:noDebug
+#end
+
 
 class BackgroundWorker {
 	
@@ -26,6 +31,7 @@ class BackgroundWorker {
 	private static var MESSAGE_ERROR = "__ERROR__";
 	
 	public var canceled (default, null):Bool;
+	public var completed (default, null):Bool;
 	public var doWork = new Event<Dynamic->Void> ();
 	public var onComplete = new Event<Dynamic->Void> ();
 	public var onError = new Event<Dynamic->Void> ();
@@ -62,6 +68,7 @@ class BackgroundWorker {
 	public function run (message:Dynamic = null):Void {
 		
 		canceled = false;
+		completed = false;
 		__runMessage = message;
 		
 	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
@@ -82,8 +89,10 @@ class BackgroundWorker {
 	
 	public function sendComplete (message:Dynamic = null):Void {
 		
+		completed = true;
+
 	    #if ((cpp || neko) && !LIME_SINGLE_THREADED)
-		
+
 		__messageQueue.add (MESSAGE_COMPLETE);
 		__messageQueue.add (message);
 		

@@ -2,8 +2,7 @@
 #include <cairo-ft.h>
 #include <math/Matrix3.h>
 #include <math/Vector2.h>
-#include <hx/CFFIPrimePatch.h>
-//#include <hx/CFFIPrime.h>
+#include <hx/CFFIPrime.h>
 #include <system/CFFIPointer.h>
 #include <text/Font.h>
 
@@ -292,7 +291,7 @@ namespace lime {
 			
 		}
 		
-		delete dashes;
+		delete[] dashes;
 		return result;
 		
 	}
@@ -770,7 +769,7 @@ namespace lime {
 		}
 		
 		cairo_set_dash ((cairo_t*)val_data (handle), dashPattern, length, 0);
-		delete dashPattern;
+		delete[] dashPattern;
 		
 	}
 	
@@ -845,7 +844,17 @@ namespace lime {
 	}
 	
 	
-	void lime_cairo_set_matrix (value handle, value matrix) {
+	void lime_cairo_set_matrix (value handle, double a, double b, double c, double d, double tx, double ty) {
+		
+		cairo_matrix_t cm;
+		cairo_matrix_init (&cm, a, b, c, d, tx, ty);
+		
+		cairo_set_matrix ((cairo_t*)val_data (handle), &cm);
+		
+	}
+	
+	
+	/*void lime_cairo_set_matrix (value handle, value matrix) {
 		
 		Matrix3 mat3 = Matrix3 (matrix);
 		
@@ -854,7 +863,7 @@ namespace lime {
 		
 		cairo_set_matrix ((cairo_t*)val_data (handle), &cm);
 		
-	}
+	}*/
 	
 	
 	void lime_cairo_set_miter_limit (value handle, double miterLimit) {
@@ -1114,7 +1123,8 @@ namespace lime {
 	DEFINE_PRIME2v (lime_cairo_set_line_cap);
 	DEFINE_PRIME2v (lime_cairo_set_line_join);
 	DEFINE_PRIME2v (lime_cairo_set_line_width);
-	DEFINE_PRIME2v (lime_cairo_set_matrix);
+	DEFINE_PRIME7v (lime_cairo_set_matrix);
+	//DEFINE_PRIME2v (lime_cairo_set_matrix);
 	DEFINE_PRIME2v (lime_cairo_set_miter_limit);
 	DEFINE_PRIME2v (lime_cairo_set_operator);
 	DEFINE_PRIME2v (lime_cairo_set_source);

@@ -6,7 +6,10 @@ import haxe.io.Bytes;
 import haxe.io.BytesData;
 import haxe.io.BytesInput;
 import haxe.io.BytesOutput;
+import lime._backend.native.NativeCFFI;
 import lime.app.Application;
+import lime.app.Future;
+import lime.app.Promise;
 import lime.graphics.format.BMP;
 import lime.graphics.format.JPEG;
 import lime.graphics.format.PNG;
@@ -28,8 +31,15 @@ import js.html.ImageElement;
 import js.html.Image in JSImage;
 import js.Browser;
 #elseif flash
+import flash.display.Bitmap;
 import flash.display.BitmapData;
+import flash.display.Loader;
+import flash.events.Event;
+import flash.events.IOErrorEvent;
+import flash.events.ProgressEvent;
 import flash.geom.Matrix;
+import flash.net.URLRequest;
+import flash.system.LoaderContext;
 import flash.utils.ByteArray;
 #end
 
@@ -48,13 +58,15 @@ import sys.io.File;
 import lime.graphics.console.TextureData;
 #end
 
-#if !macro
-@:build(lime.system.CFFI.build())
+#if !lime_debug
+@:fileXml('tags="haxe,release"')
+@:noDebug
 #end
 
-@:autoBuild(lime.Assets.embedImage())
+@:autoBuild(lime._macros.AssetsMacro.embedImage())
 @:allow(lime.graphics.util.ImageCanvasUtil)
 @:allow(lime.graphics.util.ImageDataUtil)
+@:access(lime._backend.native.NativeCFFI)
 @:access(lime.app.Application)
 @:access(lime.math.ColorMatrix)
 @:access(lime.math.Rectangle)
@@ -232,7 +244,6 @@ class Image {
 		
 		sourceRect = __clipRect (sourceRect);
 		if (buffer == null || sourceRect == null) return;
-		
 		if (destChannel == ALPHA && !transparent) return;
 		if (sourceRect.width <= 0 || sourceRect.height <= 0) return;
 		if (sourceRect.x + sourceRect.width > sourceImage.width) sourceRect.width = sourceImage.width - sourceRect.x;
@@ -248,6 +259,7 @@ class Image {
 				
 				#if (js && html5)
 				ImageCanvasUtil.convertToData (this);
+				ImageCanvasUtil.convertToData (sourceImage);
 				#end
 				
 				ImageDataUtil.copyChannel (this, sourceImage, sourceRect, destPoint, sourceChannel, destChannel);
@@ -317,6 +329,14 @@ class Image {
 			destPoint.y = 0;					//clamp destination point to 0
 		}
 		
+		// TODO: Optimize
+
+		if (sourceImage == this) {
+
+			sourceImage = clone ();
+
+		}
+
 		switch (type) {
 			
 			case CANVAS:
@@ -457,7 +477,7 @@ class Image {
 	}
 	
 	
-	public static function fromBase64 (base64:String, type:String, onload:Image -> Void):Image {
+	public static function fromBase64 (base64:String, type:String, onload:Image->Void):Image {
 		
 		if (base64 == null) return null;
 		var image = new Image ();
@@ -485,7 +505,7 @@ class Image {
 	}
 	
 	
-	public static function fromBytes (bytes:Bytes, onload:Image -> Void = null):Image {
+	public static function fromBytes (bytes:Bytes, onload:Image->Void = null):Image {
 		
 		if (bytes == null) return null;
 		var image = new Image ();
@@ -495,14 +515,14 @@ class Image {
 	}
 	
 	public static function fromPixels (bytes:Bytes, onload:Image -> Void = null, width: Int, height: Int):Image {
-		
+
 		if (bytes == null) return null;
 		var image = new Image ();
 		image.__fromPixels (bytes, onload, width, height);
 		return image;
-		
+
 	}
-	
+
 	#if (js && html5)
 	public static function fromCanvas (canvas:CanvasElement):Image {
 	#else
@@ -521,6 +541,7 @@ class Image {
 	
 	public static function fromFile (path:String, onload:Image -> Void = null, onerror:Void -> Void = null):Image {
 		
+		if (path == null) return null;
 		var image = new Image ();
 		image.__fromFile (path, onload, onerror);
 		return image;
@@ -543,6 +564,7 @@ class Image {
 		
 	}
 	
+
 	public function getColorBoundsRect (mask:Int, color:Int, findColor:Bool = true, format:PixelFormat = null):Rectangle {
 		
 		if (buffer == null) return null;
@@ -724,6 +746,187 @@ class Image {
 	}
 	
 	
+	public static function loadFromBase64 (base64:String, type:String):Future<Image> {
+
+		if (base64 == null || type == null) return Future.withValue (null);
+
+		var promise = new Promise<Image> ();
+
+		#if (js && html5)
+		var image = new JSImage ();
+
+		image.addEventListener ("load", function (event) {
+
+			var buffer = new ImageBuffer (null, image.width, image.height);
+			buffer.__srcImage = cast image;
+
+			promise.complete (new Image (buffer));
+
+		}, false);
+
+		image.addEventListener ("progress", function (event) {
+
+			promise.progress (event.loaded, event.total);
+
+		}, false);
+
+		image.addEventListener ("error", function (event) {
+
+			promise.error (event.detail);
+
+		}, false);
+
+		image.src = "data:" + type + ";base64," + base64;
+
+		#else
+
+		promise.error ("");
+
+		#end
+
+		return promise.future;
+
+	}
+
+
+	public static function loadFromBytes (bytes:Bytes):Future<Image> {
+
+		if (bytes == null) return Future.withValue (null);
+
+		#if (js && html5)
+
+		var type = "";
+
+		if (__isPNG (bytes)) {
+
+			type = "image/png";
+
+		} else if (__isJPG (bytes)) {
+
+			type = "image/jpeg";
+
+		} else if (__isGIF (bytes)) {
+
+			type = "image/gif";
+
+		} else {
+
+			throw "Image tried to read PNG/JPG Bytes, but found an invalid header.";
+
+		}
+
+		return loadFromBase64 (__base64Encode (bytes), type);
+
+		#elseif flash
+
+		var promise = new Promise<Image> ();
+
+		var loader = new Loader ();
+
+		loader.contentLoaderInfo.addEventListener (Event.COMPLETE, function (event) {
+
+			promise.complete (Image.fromBitmapData (cast (loader.content, Bitmap).bitmapData));
+
+		});
+
+		loader.contentLoaderInfo.addEventListener (ProgressEvent.PROGRESS, function (event) {
+
+			promise.progress (event.bytesLoaded, event.bytesTotal);
+
+		});
+
+		loader.contentLoaderInfo.addEventListener (IOErrorEvent.IO_ERROR, function (event) {
+
+			promise.error (event.error);
+
+		});
+
+		loader.loadBytes (bytes.getData ());
+
+		return promise.future;
+
+		#else
+
+		return new Future<Image> (function () return fromBytes (bytes), true);
+
+		#end
+
+	}
+
+
+	public static function loadFromFile (path:String):Future<Image> {
+
+		if (path == null) return Future.withValue (null);
+
+		#if (js && html5)
+
+		var promise = new Promise<Image> ();
+
+		var image = new JSImage ();
+		image.crossOrigin = "Anonymous";
+
+		image.addEventListener ("load", function (event) {
+
+			var buffer = new ImageBuffer (null, image.width, image.height);
+			buffer.__srcImage = cast image;
+
+			promise.complete (new Image (buffer));
+
+		}, false);
+
+		image.addEventListener ("progress", function (event) {
+
+			promise.progress (event.loaded, event.total);
+
+		}, false);
+
+		image.addEventListener ("error", function (event) {
+
+			promise.error (event.detail);
+
+		}, false);
+
+		image.src = path;
+
+		return promise.future;
+
+		#elseif flash
+
+		var promise = new Promise<Image> ();
+
+		var loader = new Loader ();
+
+		loader.contentLoaderInfo.addEventListener (Event.COMPLETE, function (event) {
+
+			promise.complete (Image.fromBitmapData (cast (loader.content, Bitmap).bitmapData));
+
+		});
+
+		loader.contentLoaderInfo.addEventListener (ProgressEvent.PROGRESS, function (event) {
+
+			promise.progress (event.bytesLoaded, event.bytesTotal);
+
+		});
+
+		loader.contentLoaderInfo.addEventListener (IOErrorEvent.IO_ERROR, function (event) {
+
+			promise.error (event.error);
+
+		});
+
+		loader.load (new URLRequest (path), new LoaderContext (true));
+
+		return promise.future;
+
+		#else
+
+		return new Future<Image> (function () return fromFile (path), true);
+
+		#end
+
+	}
+
+
 	public function merge (sourceImage:Image, sourceRect:Rectangle, destPoint:Vector2, redMultiplier:Int, greenMultiplier:Int, blueMultiplier:Int, alphaMultiplier:Int):Void {
 		
 		if (buffer == null || sourceImage == null) return;
@@ -751,7 +954,7 @@ class Image {
 			
 			default:
 				
-				return null;
+				return;
 			
 		}
 		
@@ -806,13 +1009,7 @@ class Image {
 				ImageCanvasUtil.scroll (this, x, y);
 			
 			case DATA:
-				
-				//#if (js && html5)
-				//ImageCanvasUtil.convertToData (this);
-				//#end
-				
-				//ImageDataUtil.scroll (this, x, y);
-				
+
 				copyPixels (this, rect, new Vector2 (x, y));
 			
 			case FLASH:
@@ -1104,7 +1301,6 @@ class Image {
 		
 		#if (js && html5)
 		var image = new JSImage ();
-		image.crossOrigin = "Anonymous";
 		
 		var image_onLoaded = function (event) {
 			
@@ -1161,14 +1357,25 @@ class Image {
 			
 			throw "Image.fromBytes not implemented for console target";
 			
-		#elseif ((cpp || neko || nodejs) && !macro)
+		#elseif (lime_cffi && !macro)
 			
-			var data:Dynamic = lime_image_load (bytes);
+			var imageBuffer:ImageBuffer = null;
 			
+			#if !cs
+			imageBuffer = NativeCFFI.lime_image_load (bytes, new ImageBuffer (new UInt8Array (Bytes.alloc (0))));
+			#else
+			var data = NativeCFFI.lime_image_load (bytes, null);
 			if (data != null) {
+				imageBuffer = new ImageBuffer (new UInt8Array (@:privateAccess new Bytes (data.data.buffer.length, data.data.buffer.b)), data.width, data.height, data.bitsPerPixel);
+			}
+			#end
+
+			if (imageBuffer != null) {
+
+				__fromImageBuffer (imageBuffer);
 
 				__fromImageBuffer (new ImageBuffer (new UInt8Array (@:privateAccess new Bytes (data.data.length, data.data.b)), data.width, data.height, data.bitsPerPixel));
-				
+
 				if (onload != null) {
 					
 					onload (this);
@@ -1178,62 +1385,62 @@ class Image {
 			}
 			
 		#else
-			
+
 			throw "ImageBuffer.loadFromBytes not supported on this target";
-			
+
 		#end
-		
+
 	}
-	
-	
+
+
 	private function __fromPixels (bytes:Bytes, onload:Image -> Void, width: Int, height: Int ):Void {
-		
+
 		#if (js && html5)
-			
+
 			var type = "";
-			
+
 			if (__isPNG (bytes)) {
-				
+
 				type = "image/png";
-				
+
 			} else if (__isJPG (bytes)) {
-				
+
 				type = "image/jpeg";
-				
+
 			} else if (__isGIF (bytes)) {
-				
+
 				type = "image/gif";
-				
+
 			} else {
-				
+
 				throw "Image tried to read PNG/JPG Bytes, but found an invalid header.";
-				
+
 			}
-			
+
 			__fromBase64 (__base64Encode (bytes), type, onload);
-			
+
 		#elseif lime_console
-			
+
 			throw "Image.fromBytes not implemented for console target";
-			
+
 		#elseif ((cpp || neko || nodejs) && !macro)
-		    
+
 			__fromImageBuffer (new ImageBuffer (UInt8Array.fromBytes(bytes), width, height));
-				
+
 			if (onload != null) {
-					
+
 				onload (this);
-					
+
 			}
-			
+
 		#else
 			
-			throw "ImageBuffer.loadFromBytes not supported on this target";
+			throw "ImageBuffer.fromPixels not supported on this target";
 			
 		#end
 		
 	}
-	
+
 	private function __fromFile (path:String, onload:Image -> Void, onerror:Void -> Void):Void {
 		
 		#if (js && html5)
@@ -1273,9 +1480,9 @@ class Image {
 			// (issue #1019768)
 			if (image.complete) { }
 			
-		#elseif (cpp || neko || nodejs || java)
+		#elseif (lime_cffi || java)
 			
-			var buffer = null;
+			var buffer:ImageBuffer = null;
 			
 			#if lime_console
 			
@@ -1331,14 +1538,14 @@ class Image {
 			#else
 			if (CFFI.enabled) {
 				
-				var data:Dynamic = lime_image_load (path);
-				
+				#if !cs
+				buffer = NativeCFFI.lime_image_load (path, new ImageBuffer (new UInt8Array (Bytes.alloc (0))));
+				#else
+				var data = NativeCFFI.lime_image_load (path, null);
 				if (data != null) {
-					
-					var u8a = new UInt8Array (@:privateAccess new Bytes (data.data.length, data.data.b));
-					buffer = new ImageBuffer (u8a, data.width, data.height, data.bitsPerPixel);
-					
+					buffer = new ImageBuffer (new UInt8Array (@:privateAccess new Bytes (data.data.buffer.length, data.data.buffer.b)), data.width, data.height, data.bitsPerPixel);
 				}
+				#end
 				
 			}
 			#end
@@ -1394,10 +1601,10 @@ class Image {
 				}
 				
 			}
-			
+
 		#else
 			
-			throw "ImageBuffer.loadFromFile not supported on this target";
+			throw "Image.fromFile not supported on this target";
 			
 		#end
 		
@@ -1672,17 +1879,5 @@ class Image {
 		
 	}
 	
-	
-	
-	
-	// Native Methods
-	
-	
-	
-	
-	#if ((cpp || neko || nodejs) && !macro)
-	@:cffi private static function lime_image_load (data:Dynamic):Dynamic;
-	#end
-	
-	
+
 }

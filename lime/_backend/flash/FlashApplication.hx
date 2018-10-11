@@ -12,7 +12,7 @@ import flash.Lib;
 import haxe.Timer;
 import lime.app.Application;
 import lime.app.Config;
-import lime.audio.AudioManager;
+import lime.media.AudioManager;
 import lime.graphics.Renderer;
 import lime.ui.KeyCode;
 import lime.ui.KeyModifier;
@@ -26,6 +26,8 @@ import lime.ui.Window;
 class FlashApplication {
 	
 	
+	private var cacheMouseX:Float;
+	private var cacheMouseY:Float;
 	private var cacheTime:Int;
 	private var currentTouches = new Map<Int, Touch> ();
 	private var mouseLeft:Bool;
@@ -38,6 +40,9 @@ class FlashApplication {
 		this.parent = parent;
 		
 		Lib.current.stage.frameRate = 60;
+		
+		cacheMouseX = 0;
+		cacheMouseY = 0;
 		
 		AudioManager.init ();
 		
@@ -248,8 +253,15 @@ class FlashApplication {
 						
 					}
 					
-					parent.window.onMouseMove.dispatch (event.stageX, event.stageY);
-				
+					var mouseX = event.stageX;
+					var mouseY = event.stageY;
+					
+					parent.window.onMouseMove.dispatch (mouseX, mouseY);
+					parent.window.onMouseMoveRelative.dispatch (mouseX - cacheMouseX, mouseY - cacheMouseY);
+					
+					cacheMouseX = mouseX;
+					cacheMouseY = mouseY;
+					
 				case "mouseUp", "middleMouseUp", "rightMouseUp":
 					
 					parent.window.onMouseUp.dispatch (event.stageX, event.stageY, button);

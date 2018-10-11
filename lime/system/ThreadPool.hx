@@ -19,6 +19,11 @@ import neko.vm.Thread;
 #end
 #end
 
+#if !lime_debug
+@:fileXml('tags="haxe,release"')
+@:noDebug
+#end
+
 
 class ThreadPool {
 	

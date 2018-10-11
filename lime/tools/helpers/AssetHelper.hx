@@ -7,6 +7,7 @@ import haxe.Unserializer;
 import lime.tools.helpers.PathHelper;
 import lime.project.AssetType;
 import lime.project.HXProject;
+import lime.utils.AssetManifest;
 import sys.io.File;
 import sys.FileSystem;
 
@@ -14,43 +15,50 @@ import sys.FileSystem;
 class AssetHelper {
 	
 	
-	public static function createManifest (project:HXProject, targetPath:String = ""):String {
+	public static function createManifest (project:HXProject, targetPath:String = ""):AssetManifest {
 		
-		var manifest = new Array <Dynamic> ();
+		var manifest = new AssetManifest ();
 		
 		for (asset in project.assets) {
 			
 			if (asset.type != AssetType.TEMPLATE) {
 				
-				var data = {
-					id : asset.id,
-					path : asset.resourceName,
-					type : Std.string (asset.type)
+				var size = 100;
+				
+				if (FileSystem.exists (asset.sourcePath)) {
+					
+					size = FileSystem.stat (asset.sourcePath).size;
+					
 				}
 				
-				manifest.push (data);
+				manifest.assets.push ({
+					
+					id: asset.id,
+					path: asset.resourceName,
+					type: Std.string (asset.type),
+					size: size
+					
+				});
 				
 			}
 			
 		}
 		
-		var data = Serializer.run (manifest);
-		
 		if (targetPath != "") {
 			
 			PathHelper.mkdir (Path.directory (targetPath));
-			File.saveContent (targetPath, data);
+			File.saveContent (targetPath, manifest.serialize ());
 			
 		}
 		
-		return data;
+		return manifest;
 		
 	}
 	
 	
 	public static function processLibraries (project:HXProject, targetDirectory:String = null):Void {
 		
-		var handlers = new Array <String> ();
+		var handlers = new Array<String> ();
 		
 		for (library in project.libraries) {
 			
@@ -133,5 +141,5 @@ class AssetHelper {
 		
 	}
 	
-
+	
 }

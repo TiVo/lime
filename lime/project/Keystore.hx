@@ -12,8 +12,8 @@ class Keystore {
     public var developmentTeam:String;
     public var provisioningProfile:String;
     public var provisioningProfileSpecifier:String;
-	
-	public function new (path:String = null, password:String = null, alias:String = null, aliasPassword:String = null, identity:String = null, developmentTeam:String = null, provisioningProfile:String = null, provisioningProfileSpecifier:String = null) {
+
+	public function new (path:String = null, password:String = null, alias:String = null, aliasPassword:String = null, identity:String = null) {
 		
 		this.path = path;
 		this.password = password;

@@ -1,6 +1,7 @@
 package lime.ui;
 
 
+import lime._backend.native.NativeCFFI;
 import lime.app.Event;
 import lime.system.BackgroundWorker;
 import lime.utils.Resource;
@@ -9,9 +10,12 @@ import lime.utils.Resource;
 import sys.io.File;
 #end
 
-#if !macro
-@:build(lime.system.CFFI.build())
+#if !lime_debug
+@:fileXml('tags="haxe,release"')
+@:noDebug
 #end
+
+@:access(lime._backend.native.NativeCFFI)
 
 
 class FileDialog {
@@ -36,7 +40,6 @@ class FileDialog {
 		if (type == null) type = FileDialogType.OPEN;
 		
 		#if desktop
-		#if !mac
 		
 		var worker = new BackgroundWorker ();
 		
@@ -46,19 +49,19 @@ class FileDialog {
 				
 				case OPEN:
 					
-					worker.sendComplete (lime_file_dialog_open_file (filter, defaultPath));
+					worker.sendComplete (NativeCFFI.lime_file_dialog_open_file (filter, defaultPath));
 				
 				case OPEN_MULTIPLE:
 					
-					worker.sendComplete (lime_file_dialog_open_files (filter, defaultPath));
+					worker.sendComplete (NativeCFFI.lime_file_dialog_open_files (filter, defaultPath));
 				
 				case OPEN_DIRECTORY:
 					
-					worker.sendComplete (lime_file_dialog_open_directory (filter, defaultPath));
+					worker.sendComplete (NativeCFFI.lime_file_dialog_open_directory (filter, defaultPath));
 				
 				case SAVE:
 					
-					worker.sendComplete (lime_file_dialog_save_file (filter, defaultPath));
+					worker.sendComplete (NativeCFFI.lime_file_dialog_save_file (filter, defaultPath));
 				
 			}
 			
@@ -102,61 +105,6 @@ class FileDialog {
 		
 		worker.run ();
 		
-		#else
-		
-		var path:String = null;
-		var paths:Array<String> = null;
-		
-		switch (type) {
-			
-			case OPEN:
-				
-				path = lime_file_dialog_open_file (filter, defaultPath);
-			
-			case OPEN_DIRECTORY:
-				
-				path = lime_file_dialog_open_directory (filter, defaultPath);
-			
-			case OPEN_MULTIPLE:
-				
-				paths = lime_file_dialog_open_files (filter, defaultPath);
-			
-			case SAVE:
-				
-				path = lime_file_dialog_save_file (filter, defaultPath);
-			
-		}
-		
-		switch (type) {
-			
-			case OPEN, OPEN_DIRECTORY, SAVE:
-				
-				if (path != null) {
-					
-					onSelect.dispatch (path);
-					
-				} else {
-					
-					onCancel.dispatch ();
-					
-				}
-			
-			case OPEN_MULTIPLE:
-				
-				if (paths != null && paths.length > 0) {
-					
-					onSelectMultiple.dispatch (paths);
-					
-				} else {
-					
-					onCancel.dispatch ();
-					
-				}
-			
-		}
-		
-		#end
-		
 		return true;
 		
 		#else
@@ -172,13 +120,12 @@ class FileDialog {
 	public function open (filter:String = null, defaultPath:String = null):Bool {
 		
 		#if desktop
-		#if !mac
 		
 		var worker = new BackgroundWorker ();
 		
 		worker.doWork.add (function (_) {
 			
-			worker.sendComplete (lime_file_dialog_open_file (filter, defaultPath));
+			worker.sendComplete (NativeCFFI.lime_file_dialog_open_file (filter, defaultPath));
 			
 		});
 		
@@ -202,28 +149,6 @@ class FileDialog {
 		
 		worker.run ();
 		
-		#else
-		
-		// Doesn't work in a thread
-		
-		var path:String = lime_file_dialog_open_file (filter, defaultPath);
-		
-		if (path != null) {
-			
-			try {
-				
-				var data = File.getBytes (path);
-				onOpen.dispatch (data);
-				return true;
-				
-			} catch (e:Dynamic) {}
-			
-		}
-		
-		onCancel.dispatch ();
-		
-		#end
-		
 		return true;
 		
 		#else
@@ -239,13 +164,12 @@ class FileDialog {
 	public function save (data:Resource, filter:String = null, defaultPath:String = null):Bool {
 		
 		#if desktop
-		#if !mac
 		
 		var worker = new BackgroundWorker ();
 		
 		worker.doWork.add (function (_) {
 			
-			worker.sendComplete (lime_file_dialog_save_file (filter, defaultPath));
+			worker.sendComplete (NativeCFFI.lime_file_dialog_save_file (filter, defaultPath));
 			
 		});
 		
@@ -269,26 +193,6 @@ class FileDialog {
 		
 		worker.run ();
 		
-		#else
-		
-		var path:String = lime_file_dialog_save_file (filter, defaultPath);
-		
-		if (path != null) {
-			
-			try {
-				
-				File.saveBytes (path, data);
-				onSave.dispatch (path);
-				return true;
-				
-			} catch (e:Dynamic) {}
-			
-		}
-		
-		onCancel.dispatch ();
-		
-		#end
-		
 		return true;
 		
 		#else
@@ -299,21 +203,6 @@ class FileDialog {
 		#end
 		
 	}
-	
-	
-	
-	
-	// Native Methods
-	
-	
-	
-	
-	#if (cpp || neko || nodejs)
-	@:cffi private static function lime_file_dialog_open_directory (filter:String, defaultPath:String):Dynamic;
-	@:cffi private static function lime_file_dialog_open_file (filter:String, defaultPath:String):Dynamic;
-	@:cffi private static function lime_file_dialog_open_files (filter:String, defaultPath:String):Dynamic;
-	@:cffi private static function lime_file_dialog_save_file (filter:String, defaultPath:String):Dynamic;
-	#end
 	
 	
 }
