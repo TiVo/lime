@@ -1725,7 +1725,7 @@ class ProjectXMLParser extends HXProject {
 						
 						if (element.has.path) {
 							
-							certificate = new Keystore (PathHelper.combine (extensionPath, substitute (element.att.path)));
+							keystore = new Keystore (PathHelper.combine (extensionPath, substitute (element.att.path)));
 							
 							if (element.has.type) {
 								
@@ -1757,23 +1757,23 @@ class ProjectXMLParser extends HXProject {
 							
 						} else if (element.has.identity) {
 							
-							certificate = new Keystore ();
-							certificate.identity = substitute (element.att.identity);
+							keystore = new Keystore ();
+							keystore.identity = substitute (element.att.identity);
                             if (element.has.developmentTeam) {
 
-                                certificate.developmentTeam = substitute (element.att.developmentTeam);
+								keystore.developmentTeam = substitute (element.att.developmentTeam);
 
                             }
 
                             if (element.has.provisioningProfile) {
 
-                                certificate.provisioningProfile = substitute (element.att.provisioningProfile);
+								keystore.provisioningProfile = substitute (element.att.provisioningProfile);
 
                             }
 
                             if (element.has.provisioningProfileSpecifier) {
 
-                                certificate.provisioningProfileSpecifier = substitute (element.att.provisioningProfileSpecifier);
+								keystore.provisioningProfileSpecifier = substitute (element.att.provisioningProfileSpecifier);
 
                             }
 							

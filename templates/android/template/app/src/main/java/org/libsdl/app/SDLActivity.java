@@ -240,8 +240,7 @@ public class SDLActivity extends Activity {
             mJoystickHandler = new SDLJoystickHandler();
         }
 
-        mLayout = new RelativeLayout(this);
-        mLayout.addView(mSurface);
+        mLayout = new SDLViewGroup(this, mSurface);
 
         setContentView(mLayout);
         
@@ -2273,5 +2272,30 @@ class SDLGenericMotionListener_API12 implements View.OnGenericMotionListener {
 
         // Event was not managed
         return false;
+    }
+}
+
+class SDLViewGroup extends RelativeLayout
+{
+    private View mSdlView = null;
+
+    public SDLViewGroup(Context context, View sdlView)
+    {
+        super(context);
+        if (sdlView != null)
+        {
+            mSdlView = sdlView;
+            addView(mSdlView);
+        }
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event)
+    {
+        if (mSdlView != null && getFocusedChild() != mSdlView)
+        {
+            mSdlView.dispatchKeyEvent(event);
+        }
+        return super.dispatchKeyEvent(event);
     }
 }

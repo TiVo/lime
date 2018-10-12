@@ -1374,8 +1374,6 @@ class Image {
 
 				__fromImageBuffer (imageBuffer);
 
-				__fromImageBuffer (new ImageBuffer (new UInt8Array (@:privateAccess new Bytes (data.data.length, data.data.b)), data.width, data.height, data.bitsPerPixel));
-
 				if (onload != null) {
 					
 					onload (this);

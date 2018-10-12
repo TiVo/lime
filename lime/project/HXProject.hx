@@ -1341,21 +1341,21 @@ class HXProject {
 				
 			}
 
-            if (certificate.developmentTeam != null) {
+            if (keystore.developmentTeam != null) {
 
-                context.KEY_STORE_DEVELOPMENT_TEAM = certificate.developmentTeam;
-
-            }
-
-            if (certificate.provisioningProfile != null) {
-
-                context.KEY_STORE_PROVISIONING_PROFILE = certificate.provisioningProfile;
+                context.KEY_STORE_DEVELOPMENT_TEAM = keystore.developmentTeam;
 
             }
 
-            if (certificate.provisioningProfileSpecifier != null) {
+            if (keystore.provisioningProfile != null) {
 
-                context.KEY_STORE_PROVISIONING_PROFILE_SPECIFIER = certificate.provisioningProfileSpecifier;
+                context.KEY_STORE_PROVISIONING_PROFILE = keystore.provisioningProfile;
+
+            }
+
+            if (keystore.provisioningProfileSpecifier != null) {
+
+                context.KEY_STORE_PROVISIONING_PROFILE_SPECIFIER = keystore.provisioningProfileSpecifier;
 
             }
 

@@ -113,3 +113,28 @@ Lime currently supports the following targets:
     lime test flash
 
 Desktop builds are currently designed to be built on the same host OS
+
+TiVo Local Changes
+=============
+TiVo first 'forked' the Lime project from a specific commit from https://github.com/openfl/lime
+	
+	06/03/2016
+	a6c93ea0501c3be01fd3daeefb702b9f560a52c7.
+
+This was checked into perforce, with the submodules collapsed as:
+
+    Change 912615 on 2016/06/03 by bji@bji-b-haxetools-mainline-openfl-fixes 'Integrate newest lime and openf'
+ 
+TiVo CHANGELOG
+--------------
+
+### Initial (P4 912615)
+Initial checkin from pre-3.2.0 commit: `* a6c93ea0 2016-06-03 | Update Cairo`
+
+### Update and Merge with [3.7.0 (01/24/2017)](https://github.com/openfl/lime/blob/develop/CHANGELOG.md#370-01242017)
+
+The SDL submodule is updated to 2.0.5 plus some local TiVo changes. These are
+tracked in TBS git.
+
+Update and merge with 3.7.0 to allow post Android 16 support.
+
