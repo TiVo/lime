@@ -52,6 +52,8 @@ class HXProject {
 	public var meta:MetaData;
 	public var modules:Map<String, ModuleData>;
 	public var ndlls:Array<NDLL>;
+    // ndlls that are installed, but not auto-loaded at application startup
+    public var libs:Array <NDLL>;
 	public var platformType:PlatformType;
 	public var postBuildCallbacks:Array<CLICommand>;
 	public var preBuildCallbacks:Array<CLICommand>;
@@ -250,6 +252,7 @@ class HXProject {
 		libraryHandlers = new Map<String, String> ();
 		modules = new Map<String, ModuleData> ();
 		ndlls = new Array<NDLL> ();
+		libs = new Array <NDLL> ();
 		postBuildCallbacks = new Array<CLICommand> ();
 		preBuildCallbacks = new Array<CLICommand> ();
 		sources = new Array<String> ();
@@ -350,6 +353,12 @@ class HXProject {
 			
 		}
 		
+		for (lib in libs) {
+			
+			project.libs.push (lib.clone ());
+			
+		}
+
 		project.platformType = platformType;
 		project.postBuildCallbacks = postBuildCallbacks.copy ();
 		project.preBuildCallbacks = preBuildCallbacks.copy ();
@@ -788,6 +797,7 @@ class HXProject {
 			}
 			
 			ndlls = ArrayHelper.concatUnique (ndlls, project.ndlls);
+			libs = ArrayHelper.concatUnique (libs, project.libs);
 			postBuildCallbacks = postBuildCallbacks.concat (project.postBuildCallbacks);
 			preBuildCallbacks = preBuildCallbacks.concat (project.preBuildCallbacks);
 			samplePaths = ArrayHelper.concatUnique (samplePaths, project.samplePaths, true);
@@ -841,6 +851,16 @@ class HXProject {
 					
 				}
 				
+				for (lib in includeProject.libs) {
+					
+					if (lib.haxelib == null) {
+						
+						lib.haxelib = haxelib;
+						
+					}
+					
+				}
+                
 				project.merge (includeProject);
 				
 			}
@@ -1320,7 +1340,25 @@ class HXProject {
 				context.KEY_STORE_ALIAS_PASSWORD = keystore.password;
 				
 			}
+
+            if (certificate.developmentTeam != null) {
+
+                context.KEY_STORE_DEVELOPMENT_TEAM = certificate.developmentTeam;
+                
+            }
 			
+            if (certificate.provisioningProfile != null) {
+
+                context.KEY_STORE_PROVISIONING_PROFILE = certificate.provisioningProfile;
+                
+            }
+
+            if (certificate.provisioningProfileSpecifier != null) {
+
+                context.KEY_STORE_PROVISIONING_PROFILE_SPECIFIER = certificate.provisioningProfileSpecifier;
+                
+            }
+
 		}
 		
 		context.config = config;

@@ -171,6 +171,14 @@ namespace lime {
 	}
 	
 	
+	void lime_application_schedule (value application) {
+		
+		Application* app = (Application*)val_data (application);
+		app->Schedule ();
+		
+	}
+	
+	
 	value lime_audio_load (value data, value buffer) {
 		
 		Resource resource;
@@ -488,7 +496,7 @@ namespace lime {
 		Font *font = (Font*)val_data (fontHandle);
 		wchar_t *name = font->GetFamilyName ();
 		value result = alloc_wstring (name);
-		delete name;
+		delete[] name;
 		return result;
 		#else
 		return alloc_null ();
@@ -1731,6 +1739,7 @@ namespace lime {
 	DEFINE_PRIME1 (lime_application_quit);
 	DEFINE_PRIME2v (lime_application_set_frame_rate);
 	DEFINE_PRIME1 (lime_application_update);
+	DEFINE_PRIME1v (lime_application_schedule);
 	DEFINE_PRIME2 (lime_audio_load);
 	DEFINE_PRIME2 (lime_bytes_from_data_pointer);
 	DEFINE_PRIME1 (lime_bytes_get_data_pointer);

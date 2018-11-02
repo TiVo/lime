@@ -5,12 +5,62 @@
 
 
 namespace lime {
+
+    class CURLRoots
+    {
+    public:
+        
+        CURLRoots()
+            : readfunction_callback(0), writefunction_callback(0),
+              headerfunction_callback(0), progressfunction_callback(0)
+        {
+        }
+
+        ~CURLRoots()
+        {
+            delete readfunction_callback;
+            delete writefunction_callback;
+            delete headerfunction_callback;
+            delete progressfunction_callback;
+        }
+        
+        AutoGCRoot *readfunction_callback;
+        AutoGCRoot *writefunction_callback;
+        AutoGCRoot *headerfunction_callback;
+        AutoGCRoot *progressfunction_callback;
+    };
 	
-	
+
+    static CURLRoots *get_roots(CURL *curl)
+    {
+        CURLRoots *roots;
+        
+        if (curl_easy_getinfo(curl, CURLINFO_PRIVATE, &roots) != CURLE_OK) {
+            roots = 0;
+        }
+
+        if (!roots) {
+            roots = new CURLRoots();
+            curl_easy_setopt(curl, CURLOPT_PRIVATE, roots);
+        }
+
+        return roots;
+    }
+
+
 	void lime_curl_easy_cleanup (double handle) {
-		
+
+        CURL *curl = (CURL*) (intptr_t) handle;
+
+        CURLRoots *roots;
+        
+        if (curl_easy_getinfo(curl, CURLINFO_PRIVATE, &roots) == CURLE_OK) {
+            delete roots;
+            curl_easy_setopt(curl, CURLOPT_PRIVATE, 0);
+        }
+        
 		curl_easy_cleanup ((CURL*)(intptr_t)handle);
-		
+
 	}
 	
 	
@@ -449,30 +499,38 @@ namespace lime {
 			
 			case CURLOPT_READFUNCTION:
 			{
-				AutoGCRoot* callback = new AutoGCRoot (parameter);
+                CURLRoots *roots = get_roots(curl);
+                delete roots->readfunction_callback;
+                roots->readfunction_callback = new AutoGCRoot (parameter);
 				code = curl_easy_setopt (curl, type, read_callback);
-				curl_easy_setopt (curl, CURLOPT_READDATA, callback);
+				curl_easy_setopt (curl, CURLOPT_READDATA, roots->readfunction_callback);
 				break;
 			}
 			case CURLOPT_WRITEFUNCTION:
 			{
-				AutoGCRoot* callback = new AutoGCRoot (parameter);
+                CURLRoots *roots = get_roots(curl);
+                delete roots->writefunction_callback;
+                roots->writefunction_callback = new AutoGCRoot (parameter);
 				code = curl_easy_setopt (curl, type, write_callback);
-				curl_easy_setopt (curl, CURLOPT_WRITEDATA, callback);
+				curl_easy_setopt (curl, CURLOPT_WRITEDATA, roots->writefunction_callback);
 				break;
 			}
 			case CURLOPT_HEADERFUNCTION:
 			{
-				AutoGCRoot* callback = new AutoGCRoot (parameter);
+                CURLRoots *roots = get_roots(curl);
+                delete roots->headerfunction_callback;
+                roots->headerfunction_callback = new AutoGCRoot (parameter);
 				code = curl_easy_setopt (curl, type, write_callback);
-				curl_easy_setopt (curl, CURLOPT_HEADERDATA, callback);
+				curl_easy_setopt (curl, CURLOPT_HEADERDATA, roots->headerfunction_callback);
 				break;
 			}
 			case CURLOPT_PROGRESSFUNCTION:
 			{
-				AutoGCRoot* callback = new AutoGCRoot (parameter);
+                CURLRoots *roots = get_roots(curl);
+                delete roots->progressfunction_callback;
+                roots->progressfunction_callback = new AutoGCRoot (parameter);
 				code = curl_easy_setopt (curl, type, progress_callback);
-				curl_easy_setopt (curl, CURLOPT_PROGRESSDATA, callback);
+				curl_easy_setopt (curl, CURLOPT_PROGRESSDATA, roots->progressfunction_callback);
 				curl_easy_setopt (curl, CURLOPT_NOPROGRESS, false);
 				break;
 			}
@@ -546,14 +604,49 @@ namespace lime {
 	}
 	
 	
-	//lime_curl_multi_add_handle
+    void lime_curl_multi_add_handle (double multiHandle, double easyHandle) {
+        CURLM *multi = (CURLM *) (intptr_t) multiHandle;
+		CURL *easy = (CURL *) (intptr_t) easyHandle;
+        (void) curl_multi_add_handle(multi, easy);
+    }
+
+
 	//lime_curl_multi_assign
 	//lime_curl_multi_cleanup
 	//lime_curl_multi_fdset
-	//lime_curl_multi_info_read
-	//lime_curl_multi_init
-	//lime_curl_multi_perform
-	//lime_curl_multi_remove_handle
+
+
+    double lime_curl_multi_init () {
+        return (double) (intptr_t) curl_multi_init();
+    }
+
+
+    void lime_curl_multi_perform (double multiHandle, value ready)
+    {
+        CURLM *multi = (CURLM *) (intptr_t) multiHandle;
+        int junk;
+        (void) curl_multi_perform(multi, &junk);
+        while (true) {
+            struct CURLMsg *m = curl_multi_info_read(multi, &junk);
+            if (m) {
+                val_array_push
+                    (ready, alloc_float((double) (intptr_t) m->easy_handle));
+            }
+            else {
+                break;
+            }
+        }
+    }
+
+
+    void lime_curl_multi_remove_handle(double multiHandle, double easyHandle)
+    {
+        CURLM *multi = (CURLM *) (intptr_t) multiHandle;
+		CURL *easy = (CURL *) (intptr_t) easyHandle;
+        (void) curl_multi_remove_handle(multi, easy);
+    }
+
+
 	//lime_curl_multi_setopt
 	//lime_curl_multi_socket
 	//lime_curl_multi_socket_action
@@ -602,6 +695,10 @@ namespace lime {
 	DEFINE_PRIME1 (lime_curl_easy_strerror);
 	DEFINE_PRIME4 (lime_curl_easy_unescape);
 	DEFINE_PRIME2 (lime_curl_getdate);
+    DEFINE_PRIME0 (lime_curl_multi_init);
+    DEFINE_PRIME2v (lime_curl_multi_perform);
+    DEFINE_PRIME2v (lime_curl_multi_add_handle);
+    DEFINE_PRIME2v (lime_curl_multi_remove_handle);
 	DEFINE_PRIME0v (lime_curl_global_cleanup);
 	DEFINE_PRIME1 (lime_curl_global_init);
 	DEFINE_PRIME0 (lime_curl_version);

@@ -22,6 +22,7 @@ class NativeCFFI {
 	@:cffi private static function lime_application_exec (handle:Dynamic):Int;
 	@:cffi private static function lime_application_init (handle:Dynamic):Void;
 	@:cffi private static function lime_application_quit (handle:Dynamic):Int;
+	@:cffi private static function lime_application_schedule (handle:Dynamic):Void;
 	@:cffi private static function lime_application_set_frame_rate (handle:Dynamic, value:Float):Void;
 	@:cffi private static function lime_application_update (handle:Dynamic):Bool;
 	@:cffi private static function lime_audio_load (data:Dynamic, buffer:Dynamic):Dynamic;

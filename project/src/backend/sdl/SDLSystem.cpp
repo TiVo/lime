@@ -4,7 +4,7 @@
 #include <system/JNI.h>
 #include <system/System.h>
 
-#ifdef HX_MACOS
+#if (defined HX_MACOS || defined APPLETV || defined IPHONEOS)
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 
@@ -197,7 +197,7 @@ namespace lime {
 				
 				return new std::wstring (L"/Library/Fonts");
 				
-				#elif defined (IPHONEOS)
+                #elif (defined APPLETV || defined IPHONEOS)
 				
 				return new std::wstring (L"/System/Library/Fonts");
 				
@@ -529,10 +529,21 @@ namespace lime {
 		
 		SDL_RWops *result;
 		
-		#ifdef HX_MACOS
+        #if (defined HX_MACOS || defined APPLETV || defined IPHONEOS)
 		
 		result = SDL_RWFromFile (filename, "rb");
 		
+        #if (defined APPLETV || defined IPHONEOS)
+        // AppleTV and iPhone applications include their assets within a
+        // subdirectory "assets" and so try that if the code calling into
+        // fopen wasn't smart enough to prepend it ...
+        if (!result) {
+            char extra_fname[2048];
+            snprintf(extra_fname, sizeof(extra_fname), "assets/%s", filename);
+            result = SDL_RWFromFile(extra_fname, "rb");
+        }
+        #endif
+        
 		if (!result) {
 			
 			CFStringRef str = CFStringCreateWithCString (NULL, filename, kCFStringEncodingUTF8);

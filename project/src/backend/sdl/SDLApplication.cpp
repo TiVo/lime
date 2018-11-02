@@ -22,6 +22,9 @@ namespace lime {
 	std::map<int, std::map<int, int> > gamepadsAxisMap;
 	bool inBackground = false;
 	
+	const int USEREVENT_UPDATE = 0;
+	const int USEREVENT_SCHEDULE = 1;
+    bool app_paused = false;
 	
 	SDLApplication::SDLApplication () {
 		
@@ -114,14 +117,42 @@ namespace lime {
 			
 			case SDL_USEREVENT:
 				
-				if (!inBackground) {
+				switch (event->user.code) {
 					
-					currentUpdate = SDL_GetTicks ();
-					applicationEvent.type = UPDATE;
-					applicationEvent.deltaTime = currentUpdate - lastUpdate;
-					lastUpdate = currentUpdate;
+					case USEREVENT_UPDATE:
 					
-					nextUpdate += framePeriod;
+						currentUpdate = SDL_GetTicks ();
+						applicationEvent.type = UPDATE;
+						applicationEvent.deltaTime = currentUpdate - lastUpdate;
+						lastUpdate = currentUpdate;
+						
+						nextUpdate += framePeriod;
+						
+						while (nextUpdate <= currentUpdate) {
+							
+							nextUpdate += framePeriod;
+							
+						}
+						
+						ApplicationEvent::Dispatch (&applicationEvent);
+                        if (!app_paused || renderEvent.type != RENDER)
+                        {
+                            //dispatch the types other than RENDER always, 
+                            //only dispatch RENDER when unpaused.
+                            //the other types are CONTEXT_LOST and CONTEXT_RESTORED, we always need to deliver those.
+						    RenderEvent::Dispatch (&renderEvent);
+                        }
+                        else 
+                        {
+                           /* SDL_Log("SDL Application::HandleEvent-- USEREVENT_UPDATE not dispatching RenderEvent because app is paused and it's a RENDER type."); */
+                        }
+						break;
+					
+					case USEREVENT_SCHEDULE:
+					
+						applicationEvent.type = SCHEDULE;
+						ApplicationEvent::Dispatch (&applicationEvent);
+						break;
 					
 					while (nextUpdate <= currentUpdate) {
 						
@@ -137,19 +168,15 @@ namespace lime {
 				break;
 			
 			case SDL_APP_WILLENTERBACKGROUND:
-				
-				inBackground = true;
-				
+                //SDL_Log("SDL Application::HandleEvent-- SDL_APP_WILLENTERBACKGROUND -- app is now paused.");
+				app_paused = true;
 				windowEvent.type = WINDOW_DEACTIVATE;
 				WindowEvent::Dispatch (&windowEvent);
 				break;
 			
 			case SDL_APP_WILLENTERFOREGROUND:
-				
-				break;
-			
-			case SDL_APP_DIDENTERFOREGROUND:
-				
+                //SDL_Log("SDL Application::HandleEvent-- SDL_APP_WILLENTERFOREGROUND -- app is now unpaused.");
+				app_paused = false;
 				windowEvent.type = WINDOW_ACTIVATE;
 				WindowEvent::Dispatch (&windowEvent);
 				
@@ -765,7 +792,7 @@ namespace lime {
 		SDL_Event event;
 		SDL_UserEvent userevent;
 		userevent.type = SDL_USEREVENT;
-		userevent.code = 0;
+		userevent.code = USEREVENT_UPDATE;
 		userevent.data1 = NULL;
 		userevent.data2 = NULL;
 		event.type = SDL_USEREVENT;
@@ -780,7 +807,7 @@ namespace lime {
 		
 	}
 	
-	
+		
 	bool SDLApplication::Update () {
 		
 		SDL_Event event;
@@ -845,6 +872,22 @@ namespace lime {
 		#endif
 		
 		return active;
+		
+	}
+	
+	
+	void SDLApplication::Schedule () {
+		
+		SDL_Event event;
+		SDL_UserEvent userevent;
+		userevent.type = SDL_USEREVENT;
+		userevent.code = USEREVENT_SCHEDULE;
+		userevent.data1 = NULL;
+		userevent.data2 = NULL;
+		event.type = SDL_USEREVENT;
+		event.user = userevent;
+		
+		SDL_PushEvent (&event);
 		
 	}
 	

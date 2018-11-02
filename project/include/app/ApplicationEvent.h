@@ -11,7 +11,8 @@ namespace lime {
 	enum ApplicationEventType {
 		
 		UPDATE,
-		EXIT
+		EXIT,
+		SCHEDULE
 		
 	};
 	

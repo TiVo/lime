@@ -1194,6 +1194,15 @@ class ProjectXMLParser extends HXProject {
 									
 								}
 								
+								for (lib in includeProject.libs) {
+									
+									if (lib.haxelib == null) {
+										
+										lib.haxelib = haxelib;
+										
+									}
+									
+								}
 							}
 							
 							if (addSourcePath) {
@@ -1342,12 +1351,23 @@ class ProjectXMLParser extends HXProject {
 								
 							}
 							
+							for (lib in includeProject.libs) {
+								
+								if (lib.haxelib == null) {
+									
+									lib.haxelib = haxelib;
+									
+								}
+								
+							}
+                            
 							merge (includeProject);
 							
 						}
 					
-					case "ndll":
-						
+                    case "ndll",
+                         "lib":
+
 						var name = substitute (element.att.name);
 						var haxelib = null;
 						var type = NDLLType.AUTO;
@@ -1399,8 +1419,13 @@ class ProjectXMLParser extends HXProject {
 						var ndll = new NDLL (name, haxelib, type, registerStatics);
 						ndll.extensionPath = extensionPath;
 						ndll.subdirectory = subdirectory;
-						
-						ndlls.push (ndll);
+
+                        if (element.name == "ndll") {
+                            ndlls.push (ndll);
+                        }
+                        else {
+                            libs.push (ndll);
+                        }
 						
 					case "architecture":
 						
@@ -1755,6 +1780,25 @@ class ProjectXMLParser extends HXProject {
 							
 							config.set ("ios.team-id", element.att.resolve ("team-id"));
 							config.set ("tvos.team-id", element.att.resolve ("team-id"));
+							certificate = new Keystore ();
+							certificate.identity = substitute (element.att.identity);
+                            if (element.has.developmentTeam) {
+
+                                certificate.developmentTeam = substitute (element.att.developmentTeam);
+                                
+                            }
+
+                            if (element.has.provisioningProfile) {
+
+                                certificate.provisioningProfile = substitute (element.att.provisioningProfile);
+                                
+                            }
+                            
+                            if (element.has.provisioningProfileSpecifier) {
+
+                                certificate.provisioningProfileSpecifier = substitute (element.att.provisioningProfileSpecifier);
+                                
+                            }
 							
 						}
 					
@@ -2154,8 +2198,8 @@ class ProjectXMLParser extends HXProject {
 			extensionPath = Path.directory (projectFile);
 			
 		} catch (e:Dynamic) {
-			
-			LogHelper.error ("\"" + projectFile + "\" contains invalid XML data", e);
+
+			LogHelper.error ("\"" + projectFile + "\" contains invalid XML data" + e, e);
 			
 		}
 		

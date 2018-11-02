@@ -5,8 +5,12 @@
 #include <pthread.h>
 #include <android/log.h>
 #include <SDL.h>
+#include <list>
 #include <map>
+#include <signal.h>
 #include <string>
+#include <unistd.h>
+#include <vector>
 
 #define ELOG(args...) __android_log_print (ANDROID_LOG_ERROR, "Lime", args)
 
@@ -16,13 +20,52 @@
 #define JAVA_EXPORT JNIEXPORT
 #endif
 
+// This is a list of jlong values (and a lock for serializing access to it)
+// that holds the jlong's passed to the
+// Java_org_haxe_lime_Lime_releaseReference function by a Java VM finalizer
+// thread.  Instead of immediately operating on these in that thread (which
+// can cause deadlocks that crash the VM), just store them in this list, to be
+// acted on later (in the create ref function).  This allows all other locking
+// and lifecycle management to be done only from the haxe side thread, which
+// is safer and avoids the deadlocks.
+static pthread_mutex_t g_releaseRef_list_lock = PTHREAD_MUTEX_INITIALIZER;
+static std::list<jlong> g_releaseRef_list;
 
 namespace lime {
 	
 	
 	vkind gObjectKind;
-	
-	
+
+    enum { MAX_LOCALS = 20 };
+		
+
+    // Cleans up refs
+    class RefCleaner
+    {
+    public:
+
+        RefCleaner(JNIEnv *env, std::vector<jvalue> &refs)
+            : mEnv(env), mRefs(refs)
+        {
+            env->PushLocalFrame(MAX_LOCALS);
+        }
+
+        ~RefCleaner()
+        {
+            while (!mRefs.empty()) {
+                mEnv->DeleteLocalRef(mRefs.back().l);
+                mRefs.pop_back();
+            }
+            mEnv->PopLocalFrame(NULL);
+        }
+
+    private:
+
+        JNIEnv *mEnv;
+        std::vector<jvalue> &mRefs;
+    };
+
+
 	inline void release_object (value inValue) {
 		
 		if (val_is_kind (inValue, gObjectKind)) {
@@ -141,24 +184,32 @@ namespace lime {
 	struct AutoHaxe {
 		
 		
+        bool noop;
 		int base;
 		const char *message;
 		
 		
 		AutoHaxe (const char *inMessage) {
-			
-			base = 0;
-			message = inMessage;
-			gc_set_top_of_stack (&base, true);
-			//__android_log_print (ANDROID_LOG_VERBOSE, "Lime", "Enter %s %p", message, pthread_self ());
-			
+
+            if (gc_is_haxe_thread()) {
+                noop = true;
+            }
+            else {
+                noop = false;
+                base = 0;
+                message = inMessage;
+                gc_set_top_of_stack (&base, true);
+                //__android_log_print (ANDROID_LOG_VERBOSE, "Lime", "Enter %s %p", message, pthread_self ());
+            }
 		}
 		
 		
 		~AutoHaxe () {
-			
-			//__android_log_print (ANDROID_LOG_VERBOSE, "Lime", "Leave %s %p", message, pthread_self ());
-			gc_set_top_of_stack (0, true);
+
+            if (!noop) {
+                //__android_log_print (ANDROID_LOG_VERBOSE, "Lime", "Leave %s %p", message, pthread_self ());
+                gc_set_top_of_stack (0, true);
+            }
 			
 		}
 		
@@ -493,41 +544,6 @@ namespace lime {
 	pthread_mutex_t gJavaObjectsMutex;
 	
 	
-	jobject CreateJavaHaxeObjectRef (JNIEnv *env, value inValue) {
-		
-		JNIInit (env);
-		
-		if (!gJavaObjectsMutexInit) {
-			
-			gJavaObjectsMutexInit = false;
-			pthread_mutex_init (&gJavaObjectsMutex, 0);
-			
-		}
-		
-		pthread_mutex_lock (&gJavaObjectsMutex);
-		JavaHaxeReferenceMap::iterator it = gJavaObjects.find (inValue);
-		
-		if (it != gJavaObjects.end ()) {
-			
-			it->second->refCount++;
-			
-		} else {
-			
-			gJavaObjects[inValue] = new JavaHaxeReference (inValue);
-			
-		}
-		
-		pthread_mutex_unlock (&gJavaObjectsMutex);
-		
-		jobject result = env->CallStaticObjectMethod (HaxeObject, HaxeObject_create, (jlong)inValue);
-		jthrowable exc = env->ExceptionOccurred ();
-		CheckException (env);
-		
-		return result;
-		
-	}
-	
-	
 	void RemoveJavaHaxeObjectRef (value inValue) {
 		
 		pthread_mutex_lock (&gJavaObjectsMutex);
@@ -552,6 +568,59 @@ namespace lime {
 		}
 		
 		pthread_mutex_unlock (&gJavaObjectsMutex);
+		
+	}
+	
+	
+	jobject CreateJavaHaxeObjectRef (JNIEnv *env, value inValue) {
+		
+		JNIInit (env);
+		
+		if (!gJavaObjectsMutexInit) {
+			
+			gJavaObjectsMutexInit = false;
+            // Use recursive mutex to avoid deadlocks
+            gJavaObjectsMutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+			
+		}
+		
+        // Clean up any references that need to be released.  Latch the
+        // list locally so as not to hold up the releaseReference caller.
+        pthread_mutex_lock(&g_releaseRef_list_lock);
+        std::list<jlong> releaseRefs(g_releaseRef_list.begin(),
+                                     g_releaseRef_list.end());
+        g_releaseRef_list.clear();
+        pthread_mutex_unlock(&g_releaseRef_list_lock);
+
+        {
+            lime::AutoHaxe haxe ("releaseReference");
+            for (std::list<jlong>::iterator it = releaseRefs.begin();
+                 it != releaseRefs.end(); it++) {
+                value val = (value) *it;
+                RemoveJavaHaxeObjectRef(val);
+            }
+        }
+			
+		pthread_mutex_lock (&gJavaObjectsMutex);
+		JavaHaxeReferenceMap::iterator it = gJavaObjects.find (inValue);
+		
+		if (it != gJavaObjects.end ()) {
+			
+			it->second->refCount++;
+			
+		} else {
+			
+			gJavaObjects[inValue] = new JavaHaxeReference (inValue);
+			
+		}
+		
+		pthread_mutex_unlock (&gJavaObjectsMutex);
+		
+		jobject result = env->CallStaticObjectMethod (HaxeObject, HaxeObject_create, (jlong)inValue);
+		jthrowable exc = env->ExceptionOccurred ();
+		CheckException (env);
+		
+		return result;
 		
 	}
 	
@@ -647,6 +716,7 @@ namespace lime {
 	#define ARRAY_SET(PRIM,JTYPE,CREATE) \
 		case jni##PRIM: \
 		{ \
+            result = alloc_array (len); \
 			if (len > 0) {\
 				\
 				jboolean copy; \
@@ -787,7 +857,7 @@ namespace lime {
 		} else if (inType.arrayDepth == 1) {
 			
 			int len = inEnv->GetArrayLength ((jarray)inObject);
-			value result = alloc_array (len);
+			value result;
 			
 			switch (inType.element) {
 				
@@ -802,20 +872,12 @@ namespace lime {
 				
 				case jniByte:
 				{
-					if (len > 0) {
-						
-						jboolean copy;
-						jbyte *data = inEnv->GetByteArrayElements ((jbyteArray)inObject, &copy);
-						
-						for (int i = 0; i < len; i++) {
-							
-							val_array_set_i (result, i, alloc_int (data[i]));
-							
-						}
-						
-						inEnv->ReleaseByteArrayElements ((jbyteArray)inObject, data, JNI_ABORT);
-						
-					}
+                    jboolean copy;
+                    jbyte *data = inEnv->GetByteArrayElements
+                        ((jbyteArray) inObject, &copy);
+                    result = alloc_byte_array_from_data(data, len);
+                    inEnv->ReleaseByteArrayElements
+                        ((jbyteArray) inObject, data, JNI_ABORT);
 				}
 				break;
 				
@@ -978,7 +1040,8 @@ namespace lime {
 				}
 	
 	
-	bool HaxeToJNI (JNIEnv *inEnv, value inValue, JNIType inType, jvalue &out) {
+     bool HaxeToJNI (JNIEnv *inEnv, value inValue, JNIType inType, jvalue &out,
+                     std::vector<jvalue> &jargs_refs) {
 		
 		if (inType.isUnknown ()) {
 			
@@ -1001,12 +1064,14 @@ namespace lime {
 			for (int i = 0; i < len; i++) {
 				
 				jvalue elem_i;
-				HaxeToJNI (inEnv, val_array_i (inValue, i), etype, elem_i);
+				HaxeToJNI (inEnv, val_array_i (inValue, i), etype, elem_i,
+                           jargs_refs);
 				inEnv->SetObjectArrayElement (arr, i, elem_i.l);
 				
 			}
 			
 			out.l = arr;
+            jargs_refs.push_back(out);
 			return true;
 			
 		} else if (inType.arrayDepth == 1) {
@@ -1044,6 +1109,7 @@ namespace lime {
 					}
 					
 					out.l = arr;
+                    jargs_refs.push_back(out);
 					return true;
 				}
 				
@@ -1063,11 +1129,13 @@ namespace lime {
 				case jniObjectString:
 				{
 					out.l = inEnv->NewStringUTF (val_string (inValue));
+                    jargs_refs.push_back(out);
 					return true;
 				}
 				case jniObjectHaxe:
 					
 					out.l = CreateJavaHaxeObjectRef(inEnv,inValue);
+                    jargs_refs.push_back(out);
 					return true;
 				
 				case jniObject:
@@ -1079,6 +1147,7 @@ namespace lime {
 						if (val_is_string (inValue)) {
 							
 							out.l = inEnv->NewStringUTF (val_string (inValue));
+                            jargs_refs.push_back(out);
 							return true;
 							
 						}
@@ -1089,6 +1158,7 @@ namespace lime {
 					}
 					
 					out.l = obj;
+                    jargs_refs.push_back(out);
 					return true;
 				}
 				case jniBoolean: out.z = (bool)val_number (inValue); return true;
@@ -1245,9 +1315,10 @@ namespace lime {
 			
 			JNIEnv *env = (JNIEnv*)JNI::GetEnv ();
 			jvalue setValue;
-			
-			if (!HaxeToJNI (env, inValue, mFieldType, setValue)) {
-				
+            std::vector<jvalue> jargs_refs;
+            RefCleaner refCleaner(env, jargs_refs);
+            
+			if (!HaxeToJNI (env, inValue, mFieldType, setValue, jargs_refs)) {
 				ELOG ("SetStatic - bad value");
 				return;
 				
@@ -1377,9 +1448,11 @@ namespace lime {
 			
 			JNIEnv *env = (JNIEnv*)JNI::GetEnv ();
 			jvalue setValue;
-			
-			if (!HaxeToJNI (env, inValue, mFieldType, setValue)) {
-				
+            std::vector<jvalue> jargs_refs;
+            RefCleaner refCleaner(env, jargs_refs);
+            
+			if (!HaxeToJNI (env, inValue, mFieldType, setValue, jargs_refs)) {
+
 				ELOG ("SetMember - bad value");
 				return;
 				
@@ -1559,9 +1632,6 @@ namespace lime {
 	struct JNIMethod : public lime::Object {
 		
 		
-		enum { MAX = 20 };
-		
-		
 		JNIMethod (HxString inClass, HxString inMethod, HxString inSignature, bool inStatic, bool inQuiet) {
 			
 			JNIEnv *env = (JNIEnv*)JNI::GetEnv ();
@@ -1632,7 +1702,8 @@ namespace lime {
 		}
 		
 		
-		bool HaxeToJNIArgs (JNIEnv *inEnv, value inArray, jvalue *outValues) {
+		bool HaxeToJNIArgs (JNIEnv *inEnv, value inArray, jvalue *outValues,
+                            std::vector<jvalue> &jargs_refs) {
 			
 			if (val_array_size (inArray) != mArgCount) {
 				
@@ -1645,8 +1716,8 @@ namespace lime {
 				
 				value arg_i = val_array_i (inArray, i);
 				
-				if (!HaxeToJNI (inEnv, arg_i, mArgType[i], outValues[i])) {
-					
+				if (!HaxeToJNI (inEnv, arg_i, mArgType[i], outValues[i],
+                                jargs_refs)) {
 					ELOG ("HaxeToJNI could not convert param %d (%p) to %dx%d", i, arg_i, mArgType[i].element, mArgType[i].arrayDepth);
 					return false;
 					
@@ -1678,7 +1749,7 @@ namespace lime {
 			
 			while (*inSig != ')') {
 				
-				if (mArgCount == MAX) {
+				if (mArgCount == MAX_LOCALS) {
 					
 					return false;
 					
@@ -1714,11 +1785,12 @@ namespace lime {
 		value CallStatic (value inArgs) {
 			
 			JNIEnv *env = (JNIEnv*)JNI::GetEnv ();
-			env->PushLocalFrame(128);
-			jvalue jargs[MAX];
+			jvalue jargs[MAX_LOCALS];
+            std::vector<jvalue> jargs_refs;
+            RefCleaner refCleanear(env, jargs_refs);
 			
-			if (!HaxeToJNIArgs (env, inArgs, jargs)) {
-				
+			if (!HaxeToJNIArgs (env, inArgs, jargs, jargs_refs)) {
+
 				CleanStringArgs ();
 				ELOG ("CallStatic - bad argument list");
 				return alloc_null ();
@@ -1791,8 +1863,7 @@ namespace lime {
 			}
 			
 			CleanStringArgs ();
-			CheckException (env);
-			env->PopLocalFrame(NULL);
+			CheckException (env, true);
 			return result;
 			
 		}
@@ -1801,9 +1872,11 @@ namespace lime {
 		value CallMember (jobject inObject, value inArgs) {
 			
 			JNIEnv *env = (JNIEnv*)JNI::GetEnv ();
-			jvalue jargs[MAX];
+			jvalue jargs[MAX_LOCALS];
+            std::vector<jvalue> jargs_refs;
+            RefCleaner refCleaner(env, jargs_refs);
 			
-			if (!HaxeToJNIArgs (env, inArgs, jargs)) {
+			if (!HaxeToJNIArgs (env, inArgs, jargs, jargs_refs)) {
 				
 				CleanStringArgs ();
 				ELOG ("CallMember - bad argument list");
@@ -1880,7 +1953,7 @@ namespace lime {
 		jclass mClass;
 		jmethodID mMethod;
 		JNIType mReturn;
-		JNIType mArgType[MAX];
+		JNIType mArgType[MAX_LOCALS];
 		int mArgCount;
 		bool mIsConstructor;
 		
@@ -2022,15 +2095,17 @@ extern "C" {
 		delete root;
 		
 	}
-	
-	
+
 	JAVA_EXPORT jobject JNICALL Java_org_haxe_lime_Lime_releaseReference (JNIEnv * env, jobject obj, jlong handle) {
-		
-		lime::AutoHaxe haxe ("releaseReference");
-		value val = (value)handle;
-		lime::RemoveJavaHaxeObjectRef (val);
+
+        // In order to avoid deadlocks and other problems, defer the actual
+        // call to releasing the reference to happen when the next
+        // CreateJavaHaxeObjectRef occurs
+        pthread_mutex_lock(&g_releaseRef_list_lock);
+        g_releaseRef_list.push_back(handle);
+        pthread_mutex_unlock(&g_releaseRef_list_lock);
+        
 		return 0;
-		
 	}
 	
 	

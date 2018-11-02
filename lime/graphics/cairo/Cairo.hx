@@ -823,12 +823,20 @@ class Cairo {
 		return value;
 		
 	}
-	
+
+
+    // For memory churn efficiency, cache the CairoSurface target as it
+    // does not change over the lifetime of this object, and every time
+    // it is fetched from the C++ side, there is an unnecessary object churn.
+    private var saved_target : CairoSurface;
 	
 	@:noCompletion private function get_target ():CairoSurface {
 		
 		#if (lime_cffi && lime_cairo && !macro)
-		return NativeCFFI.lime_cairo_get_target (handle);
+        if (saved_target == null) {
+            saved_target = NativeCFFI.lime_cairo_get_target (handle);
+        }
+		return saved_target;
 		#else
 		return cast 0;
 		#end

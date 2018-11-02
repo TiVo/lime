@@ -87,7 +87,7 @@ class AndroidPlatform extends PlatformTarget {
 				haxeParams.push ("HXCPP_ARMV7");
 				cppParams.push ("-DHXCPP_ARMV7");
 				
-				if (hasARMV5) {
+				if (!hasARMV5) {
 					
 					path = sourceSet + "/jniLibs/armeabi-v7";
 					
@@ -110,6 +110,10 @@ class AndroidPlatform extends PlatformTarget {
 				FileHelper.copyLibrary (project, ndll, "Android", "lib", suffix, path, project.debug, ".so");
 				
 			}
+
+            for (lib in project.libs) {
+				FileHelper.copyLibrary (project, lib, "Android", "lib", suffix, path, project.debug, ".so");
+            }
 			
 			ProcessHelper.runCommand ("", "haxe", haxeParams);
 			
@@ -121,7 +125,7 @@ class AndroidPlatform extends PlatformTarget {
 			
 		}
 		
-		if (!ArrayHelper.containsValue (project.architectures, Architecture.ARMV7) || !hasARMV5) {
+		if (!ArrayHelper.containsValue (project.architectures, Architecture.ARMV7)) {
 			
 			if (FileSystem.exists (sourceSet + "/jniLibs/armeabi-v7")) {
 				
@@ -186,7 +190,7 @@ class AndroidPlatform extends PlatformTarget {
 		
 		var build = "-debug";
 		
-		if (project.keystore != null) {
+        if (!project.debug) {
 			
 			build = "-release";
 			
@@ -309,7 +313,7 @@ class AndroidPlatform extends PlatformTarget {
 		context.OUTPUT_DIR = targetDirectory;
 		context.ANDROID_INSTALL_LOCATION = project.config.getString ("android.install-location", "auto");
 		context.ANDROID_MINIMUM_SDK_VERSION = project.config.getInt ("android.minimum-sdk-version", 9);
-		context.ANDROID_TARGET_SDK_VERSION = project.config.getInt ("android.target-sdk-version", 19);
+		context.ANDROID_TARGET_SDK_VERSION = project.config.getInt ("android.target-sdk-version", 23);
 		context.ANDROID_EXTENSIONS = project.config.getArrayString ("android.extension");
 		context.ANDROID_PERMISSIONS = project.config.getArrayString ("android.permission", [ "android.permission.WAKE_LOCK", "android.permission.INTERNET", "android.permission.VIBRATE", "android.permission.ACCESS_NETWORK_STATE" ]);
 		context.ANDROID_GRADLE_VERSION = project.config.getString ("android.gradle-version", "2.10");

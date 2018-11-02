@@ -16,6 +16,7 @@
 		1EEEBAB3121AF2880048A9D1 /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1EEEBAB2121AF2880048A9D1 /* MediaPlayer.framework */; };
 		1EEEBAB3121AF2880048A9DF /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1EEEBAB2121AF2880048A9DF /* CoreAudio.framework */; };
 		1EEEBAB5121AF2880048A9DF /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1EEEBAB4121AF2880048A9DF /* CoreGraphics.framework */; };
+		00D6D3B01EDE042C000A527B /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00D6D3AF1EDE042C000A527B /* CoreMedia.framework */; };
 		1EEEBAFC121BE2980048A9DF /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1EEEBAFB121BE2980048A9DF /* AudioToolbox.framework */; };
 		1EEEBAFE121BE2980048A9DF /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1EEEBAFD121BE2980048A9DF /* AVFoundation.framework */; };
 		1EEEBB00121BE2B30048A9DF /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1EEEBAFF121BE2B30048A9DF /* Foundation.framework */; };
@@ -47,6 +48,7 @@
 		1EEEBAB2121AF2880048A9D1 /* MediaPlayer.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaPlayer.framework; path = System/Library/Frameworks/MediaPlayer.framework; sourceTree = SDKROOT; };
 		1EEEBAB2121AF2880048A9DF /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		1EEEBAB4121AF2880048A9DF /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		00D6D3AF1EDE042C000A527B /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
 		1EEEBAFB121BE2980048A9DF /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		1EEEBAFD121BE2980048A9DF /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		1EEEBAFF121BE2B30048A9DF /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -73,6 +75,7 @@
 				1EEEBAA7121AF2210048A9DF /* QuartzCore.framework in Frameworks */,
 				1EEEBAB3121AF2880048A9DF /* CoreAudio.framework in Frameworks */,
 				1EEEBAB5121AF2880048A9DF /* CoreGraphics.framework in Frameworks */,
+				00D6D3B01EDE042C000A527B /* CoreMedia.framework in Frameworks */,
 				1EEEBAFC121BE2980048A9DF /* AudioToolbox.framework in Frameworks */,
 				1EEEBAFE121BE2980048A9DF /* AVFoundation.framework in Frameworks */,
 				1EEEBB00121BE2B30048A9DF /* Foundation.framework in Frameworks */,
@@ -110,6 +113,7 @@
 				1EEEBAA6121AF2210048A9DF /* QuartzCore.framework */,
 				1EEEBAB2121AF2880048A9DF /* CoreAudio.framework */,
 				1EEEBAB4121AF2880048A9DF /* CoreGraphics.framework */,
+				00D6D3AF1EDE042C000A527B /* CoreMedia.framework */,
 				1EEEBAFF121BE2B30048A9DF /* Foundation.framework */,
 				1EEEBAFB121BE2980048A9DF /* AudioToolbox.framework */,
 				1EEEBAFD121BE2980048A9DF /* AVFoundation.framework */,
@@ -301,6 +305,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=appletvos*]" = "iPhone Developer";
+				DEVELOPMENT_TEAM = "::KEY_STORE_DEVELOPMENT_TEAM::";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					::foreach frameworkSearchPaths:: "\"::__current__::\"",
@@ -345,6 +352,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "::APP_PACKAGE::";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Debug;
@@ -354,6 +362,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=appletvos*]" = "iPhone Developer";
+				DEVELOPMENT_TEAM = "::KEY_STORE_DEVELOPMENT_TEAM::";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					::foreach frameworkSearchPaths:: "\"::__current__::\"",
@@ -393,6 +404,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "::APP_PACKAGE::";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Release;

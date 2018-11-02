@@ -2,6 +2,7 @@ package org.libsdl.app;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.File; 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -11,8 +12,13 @@ import java.lang.reflect.Method;
 
 import android.app.*;
 import android.content.*;
+import android.content.BroadcastReceiver;
 import android.text.InputType;
 import android.view.*;
+import android.view.accessibility.AccessibilityManager; 
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.View.OnFocusChangeListener; 
+import android.view.View.OnKeyListener;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
@@ -29,12 +35,14 @@ import android.graphics.drawable.Drawable;
 import android.media.*;
 import android.hardware.*;
 import android.content.pm.ActivityInfo;
+import android.content.IntentFilter;
 
 /**
     SDL Activity
 */
 public class SDLActivity extends Activity {
     private static final String TAG = "SDL";
+    private static final boolean DEBUG = false;
 
     // Keep track of the paused state
     public static boolean mIsPaused, mIsSurfaceReady, mHasFocus;
@@ -53,6 +61,7 @@ public class SDLActivity extends Activity {
     protected static View mTextEdit;
     protected static ViewGroup mLayout;
     protected static SDLJoystickHandler mJoystickHandler;
+    protected static AOBroadcastReceiver mAOBroadcastReceiver;
 
     // This is what SDL runs in. It invokes SDL_main(), eventually
     protected static Thread mSDLThread;
@@ -61,6 +70,25 @@ public class SDLActivity extends Activity {
     protected static AudioTrack mAudioTrack;
     protected static AudioRecord mAudioRecord;
 
+    private boolean isAppPaused;
+    private Intent intentWhilePaused;
+
+    // VirtualNavigation keys when Talk back is turned on
+    private static VirtualDpadKey mCenterVirtualDpadKey;
+    private static VirtualDpadKey mLeftVirtualDpadKey;
+    private static VirtualDpadKey mRightVirtualDpadKey;
+    private static VirtualDpadKey mUpVirtualDpadKey;
+    private static VirtualDpadKey mDownVirtualDpadKey;
+
+    private static boolean mShouldStartVirtualKeyPresses;
+
+    // focused view on onPause state
+    private static View mOnPauseFocusedView; 
+
+    private static boolean mIsTalkbackEnabled;
+    private Handler mVirtualNavigationFocusHandler;
+    private static final String mAutomationFileName = "tivoAutomation";
+    private static boolean mIsAutomationEnabled = false;
     /**
      * This method is called by SDL before loading the native shared libraries.
      * It can be overridden to provide names of shared libraries to be loaded.
@@ -113,6 +141,15 @@ public class SDLActivity extends Activity {
         mIsPaused = false;
         mIsSurfaceReady = false;
         mHasFocus = true;
+        mCenterVirtualDpadKey = null;
+        mLeftVirtualDpadKey = null;
+        mRightVirtualDpadKey = null;
+        mUpVirtualDpadKey = null;
+        mDownVirtualDpadKey = null;
+        mIsTalkbackEnabled = false;
+        mOnPauseFocusedView = null;
+        mAOBroadcastReceiver = null;
+        mShouldStartVirtualKeyPresses = false;
     }
 
     // Setup
@@ -122,6 +159,8 @@ public class SDLActivity extends Activity {
         Log.v(TAG, "Model: " + android.os.Build.MODEL);
         Log.v(TAG, "onCreate(): " + mSingleton);
         super.onCreate(savedInstanceState);
+        
+        checkIfAutomationEnabled();
 
         SDLActivity.initialize();
         // So we can call stuff from static callbacks
@@ -162,10 +201,38 @@ public class SDLActivity extends Activity {
 
            return;
         }
-
+        mVirtualNavigationFocusHandler = new Handler();
+        //Set the Talkback state to determine if VirtualNavigation should be enabled 
+        setTalkbackState(); 
         // Set up the surface
         mSurface = new SDLSurface(getApplication());
-
+        mSurface.setId(0);
+        mSurface.setOnFocusChangeListener(new OnFocusChangeListener() {
+                @Override
+                public void onFocusChange(View v, boolean hasFocus) {
+                    Log.i(TAG, "SDLSurface view focus change: "+hasFocus+" layout childcount: "+mLayout.getChildCount());
+                    if(shouldEnableVirtualNavigation()) {
+                        if(!hasFocus) {
+                            // If Talkback is enabled and SDLSurface does not get the focus,
+                            // Check if we have previously stored view or not.
+                            // If Stored, give the focus to that view.
+                            final View onPauseFocusedView = mOnPauseFocusedView;
+                            if(onPauseFocusedView != null) {
+                                mVirtualNavigationFocusHandler.postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        onPauseFocusedView.requestFocus();
+                                    }
+                                }, 100);
+                            }
+                        }else {
+                            // If Talkback is enabled and SDLSurface gets focus, set the focus
+                            // on VirtualDpadNavigation
+                            enableVirtualNavigation();
+                        }
+                    }
+                }
+        });
         if(Build.VERSION.SDK_INT >= 12) {
             mJoystickHandler = new SDLJoystickHandler_API12();
         }
@@ -173,8 +240,7 @@ public class SDLActivity extends Activity {
             mJoystickHandler = new SDLJoystickHandler();
         }
 
-        mLayout = new RelativeLayout(this);
-        mLayout.addView(mSurface);
+        mLayout = new SDLRelativeLayout(this, mSurface);
 
         setContentView(mLayout);
         
@@ -190,31 +256,231 @@ public class SDLActivity extends Activity {
         }
     }
 
-    // Events
     @Override
-    protected void onPause() {
+    protected void onStart()
+    {
+        Log.v(TAG, "onStart()");
+        super.onStart();     
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent)
+    {
+        Log.v(TAG, "onNewIntent(): " + intent.toUri(0));
+
+        // If app is paused, don't handle the new intent immediately --
+        // instead wait until a delay after the app is resumed
+        if (isAppPaused) {
+            if ((intent.getAction() != null) &&
+                (intent.getAction().equals(Intent.ACTION_MAIN))) {
+                this.intentWhilePaused = intent;
+            }
+            else {
+                PowerManager pm = (PowerManager)getApplicationContext().getSystemService(Context.POWER_SERVICE);
+                PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, TAG);
+                wl.acquire();
+                this.intentWhilePaused = intent;
+                wl.release();
+            }
+
+        }
+        else {
+            handleNewIntent(intent);
+        }
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event)
+    {
+        Log.w(TAG, "onKeyDown: ignoring key event code=" + keyCode + ", " +
+              "event=" + event + " that came when SDL surface did not have " +
+              "focus");
+
+        return true;
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event)
+    {
+        Log.w(TAG, "onKeyUp: ignoring key event code=" + keyCode + ", " +
+              "event=" + event + " that came when SDL surface did not have " +
+              "focus");
+
+        return true;
+    }
+    
+    // Events -- when Android calls onStop, the app is actually going into the
+    // background.  This is considered to be a "pause" for our purposes.  The
+    // Android onPause() is not used for this as it actually does not bound
+    // the scope of a background/foreground cycle (Android 'pause' is just a
+    // transient state that may not involve actually going to the background)
+    @Override
+    protected void onPause()
+    {
         Log.v(TAG, "onPause()");
         super.onPause();
-
+        isAppPaused = true;
         if (SDLActivity.mBrokenLibraries) {
            return;
         }
 
+        mOnPauseFocusedView = null;
+
+        if (mLayout != null) {
+            for (int i = 0; i < mLayout.getChildCount(); i++) {
+                if (mLayout.getChildAt(i).hasFocus()) {
+                    mOnPauseFocusedView = mLayout.getChildAt(i);
+                }
+            }
+        }
+
+        this.unregisterAOBroadcastReceiverIfNecessary();
+
+        // Assume paused activities do not have focus
+        SDLActivity.mHasFocus = false;
         SDLActivity.handlePause();
     }
 
     @Override
-    protected void onResume() {
+    protected void onStop()
+    {
+        Log.v(TAG, "onStop()");
+        super.onStop();
+        if (SDLActivity.mBrokenLibraries) {
+            return;
+        }
+
+        this.unregisterAOBroadcastReceiverIfNecessary();
+
+        if (mAudioTrack != null) {
+            mAudioTrack.stop();
+        }
+    }
+
+    @Override
+    protected void onRestart()
+    {
+        Log.v(TAG, "onRestart()");
+        super.onRestart();
+
+        if (mAudioTrack != null) {
+            mAudioTrack.play();
+        }
+    }
+
+    // Android onResume is called when returning to the foreground, which we
+    // consider to be the termination of a "pause" state
+    @Override
+    protected void onResume()
+    {
         Log.v(TAG, "onResume()");
         super.onResume();
-
+        isAppPaused = false;
         if (SDLActivity.mBrokenLibraries) {
            return;
         }
 
+        // Assume resumed apps always have focus
+        SDLActivity.mHasFocus = true;
         SDLActivity.handleResume();
+        setTalkbackState();
+        if (shouldEnableVirtualNavigation()) {
+            enableVirtualNavigation();
+        } else {
+            disableVirtualNavigation();
+        }
+
+        this.registerAOBroadcastReceiverIfNecessary();
+        
+        final View onPauseFocusedView = mOnPauseFocusedView;
+        if (onPauseFocusedView != null) {
+            // Must delay requesting focus or else Android doesn't always
+            // assign focus, 100 ms is magic!
+            // Latch the intent which may be delivered as well
+            final Intent intent = this.intentWhilePaused;
+            this.intentWhilePaused = null;
+            mVirtualNavigationFocusHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        onPauseFocusedView.requestFocus();
+                        // Now that focus is achieved, handle any deferred
+                        // intent whose effect will be to deliver a simulated
+                        // key press
+                        if (intent != null) {
+                            handleNewIntent(intent);
+                        }
+                    }
+                }, 100);
+        }    
     }
 
+    private void registerAOBroadcastReceiverIfNecessary()
+    {
+        if (mAOBroadcastReceiver == null)
+        {
+            mAOBroadcastReceiver = new AOBroadcastReceiver();
+
+            IntentFilter filter = new IntentFilter("accessibilityOptionsEvent");
+            registerReceiver(mAOBroadcastReceiver, filter);
+        }
+    }
+    
+    private void unregisterAOBroadcastReceiverIfNecessary()
+    {
+        try {
+            if (mAOBroadcastReceiver != null) 
+            {
+                unregisterReceiver(mAOBroadcastReceiver);
+            }
+        } catch (IllegalArgumentException e) {
+            Log.i(TAG, "Receiver may not be null but it is already unregistered");
+        } finally {
+            mAOBroadcastReceiver = null;
+        }
+    }
+
+    private void handleNewIntent(Intent intent)
+    {
+        // Turn Intents known to be the result of remote key presses
+        String action = intent.getAction();
+        if (action == null) {
+            return;
+        }
+
+        if (action.equals(Intent.ACTION_MAIN)) {
+            SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_HOME);
+            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_HOME);
+        }
+        else if (action.equals(Intent.ACTION_ALL_APPS)) {
+            // KEYCODE_ALL_APPS is only in Android P Developer Preview and
+            // has the value 284
+            SDLActivity.onNativeKeyDown(284);
+            SDLActivity.onNativeKeyUp(284);
+        }
+        // Special TiVO-only intents
+        else if (action.equals("com.tivo.exit")) {
+            // Deliver an exit key press, which on Android platforms is
+            // accomplished with F10, which openfl maps to EXIT
+            SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_F10);
+            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_F10);
+        }
+        else if (action.equals("com.tivo.guide")) {
+            // Deliver a guide key press
+            SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_GUIDE);
+            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_GUIDE);
+        }
+        else if (action.equals("com.tivo.vod")) {
+            // Deliver a VOD key press, which on Android platforms is
+            // accomplished with F9, which openfl maps to VOD
+            SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_F9);
+            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_F9);
+        }
+        else if (action.equals("com.tivo.voice")) {
+            // Deliver a SEARCH key press
+            SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_SEARCH);
+            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_SEARCH);
+        }
+    }
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
@@ -224,11 +490,16 @@ public class SDLActivity extends Activity {
         if (SDLActivity.mBrokenLibraries) {
            return;
         }
+        //As a rule a window of a paused activity will never have focus.
+        //However in some instances especially during deeplinking 
+        //this method gets called with hasFocus = true even when the application
+        //is paused, we need to ignore such calls to retain the sanity of this
+        //activity and its views. 
+        if (isAppPaused && hasFocus) {
+            return;
+        }
 
         SDLActivity.mHasFocus = hasFocus;
-        if (hasFocus) {
-            SDLActivity.handleResume();
-        }
     }
 
     @Override
@@ -271,17 +542,21 @@ public class SDLActivity extends Activity {
         }
 
         super.onDestroy();
-        // Reset everything in case the user re opens the app
-        SDLActivity.initialize();
+
+        // The application cannot handle the Activity being restarted, which
+        // Android is free to do after calling onDestroy(), so just die
+        // immediately rather than misbehave on a subsequent call to
+        // onCreate() in this instance of the application.
+        Log.e(TAG, "onDestroy() now exiting the application");
+        System.exit(-1);
     }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
 
         if (SDLActivity.mBrokenLibraries) {
-           return false;
+            return false;
         }
-
         int keyCode = event.getKeyCode();
         // Ignore certain special keys so they're handled by Android
         if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
@@ -295,12 +570,251 @@ public class SDLActivity extends Activity {
         return super.dispatchKeyEvent(event);
     }
 
-    /** Called by onPause or surfaceDestroyed. Even if surfaceDestroyed
+    private void checkIfAutomationEnabled() {
+        File sdcard = Environment.getExternalStorageDirectory();
+
+        if(sdcard != null) {
+            File automationFile = new File(sdcard, mAutomationFileName);
+            if(automationFile.exists()) {
+                mIsAutomationEnabled = true;
+            } 
+        }
+    }
+
+    //On AndroidTV when Talkback is enabled keyvents are not sent to the application,
+    //rather navigation happens based on neighbors of the currently focused widget. 
+    //Inorder to work around this issue...(feature?) we create a VirtualDpadNavigator 
+    //that simulates the KeyEvents based on the focus changes on its VirtualDpadKeys. 
+    private void enableVirtualNavigation() {
+        //remove any previous VirtualNavigation
+        disableVirtualNavigation();
+        mLeftVirtualDpadKey = new VirtualDpadKey(VirtualDpadKeyType.LEFT, this);
+        mRightVirtualDpadKey = new VirtualDpadKey(VirtualDpadKeyType.RIGHT, this);
+        mUpVirtualDpadKey = new VirtualDpadKey(VirtualDpadKeyType.UP, this); 
+        mDownVirtualDpadKey = new VirtualDpadKey(VirtualDpadKeyType.DOWN, this);
+        mCenterVirtualDpadKey = new VirtualDpadKey(VirtualDpadKeyType.CENTER, this);
+        
+        //Setup neighbors
+        mCenterVirtualDpadKey.setNextFocusLeftId(mLeftVirtualDpadKey.getId());
+        mCenterVirtualDpadKey.setNextFocusRightId(mRightVirtualDpadKey.getId());
+        mCenterVirtualDpadKey.setNextFocusUpId(mUpVirtualDpadKey.getId());
+        mCenterVirtualDpadKey.setNextFocusDownId(mDownVirtualDpadKey.getId());
+              
+        Log.i(TAG,"Virtual Navigation enabled");
+        for(int i = 0; i < mLayout.getChildCount(); i++) {
+            View v = mLayout.getChildAt(i);
+            Log.i(TAG,"SurfaceLayout child at: "+i+" view: "+v);
+        } 
+        //Set focus on center helepr to begin with
+        resetVirtualNavigationFocus();
+    } 
+
+    private void disableVirtualNavigation() {
+        mShouldStartVirtualKeyPresses = false;
+        if(mCenterVirtualDpadKey != null) {
+            mLayout.removeView(mCenterVirtualDpadKey);
+            mCenterVirtualDpadKey = null;
+        }
+        if(mLeftVirtualDpadKey != null) {
+             mLayout.removeView(mLeftVirtualDpadKey);
+             mLeftVirtualDpadKey = null;
+        }
+        if(mRightVirtualDpadKey != null) {
+             mLayout.removeView(mRightVirtualDpadKey);
+             mRightVirtualDpadKey = null;
+        }
+        if(mUpVirtualDpadKey != null) {
+            mLayout.removeView(mUpVirtualDpadKey);
+            mUpVirtualDpadKey = null;
+        }
+        if(mDownVirtualDpadKey != null) {
+            mLayout.removeView(mDownVirtualDpadKey);
+            mDownVirtualDpadKey = null;
+        }
+    }
+
+    private void setTalkbackState() {
+        AccessibilityManager am = (AccessibilityManager) getSystemService(ACCESSIBILITY_SERVICE);
+        mIsTalkbackEnabled = am.isEnabled();
+        Log.i(TAG, "Is TTS enabled : "+mIsTalkbackEnabled);
+    }
+
+    private boolean shouldEnableVirtualNavigation() {
+        if(mIsTalkbackEnabled && !Build.MANUFACTURER.equals("Amazon") && !mIsAutomationEnabled) {
+            return true;
+        }
+        return false;
+    }
+
+    private enum VirtualDpadKeyType {
+        CENTER,
+        LEFT,
+        RIGHT,
+        UP,
+        DOWN
+    }
+
+    private class AOBroadcastReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // Get extra data included in the Intent
+            String state = intent.getStringExtra("state");
+
+            setTalkbackState();
+
+            if(state.equals("enable")) {
+                enableVirtualNavigation();
+            }else if(state.equals("disable")) {
+                disableVirtualNavigation();
+            }
+        }
+    }
+
+    private class VirtualDpadKey extends Button {
+    
+        private final VirtualDpadKeyType mVirtualDpadKeyType;
+        public VirtualDpadKey(VirtualDpadKeyType VirtualDpadKeyType, Context context) {
+            super(context);
+            mVirtualDpadKeyType = VirtualDpadKeyType;
+            setWidth(100);
+            setHeight(100);
+            switch(mVirtualDpadKeyType) {
+                case UP:
+                setX(120);
+                setY(10);
+                break;
+                case DOWN:
+                setX(120);
+                setY(230);
+                break;
+                case LEFT:
+                setX(10);
+                setY(120);
+                break;
+                case RIGHT:
+                setX(230);
+                setY(120);
+                break;
+                case CENTER:
+                setX(120);
+                setY(120);
+                break;
+            }
+            setFocusable(true);
+            setId(mVirtualDpadKeyType.ordinal() + 1);
+            if(!DEBUG) {
+                setBackground(null);
+            }
+            setAccessibilityDelegate(new View.AccessibilityDelegate() {
+                public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
+                    super.onInitializeAccessibilityNodeInfo(host, info);
+
+                    //Blanked to prevent talkback from announcing class/type and description
+                    info.setClassName("");
+                    info.setContentDescription("");
+                }
+            });
+            setOnFocusChangeListener(new OnFocusChangeListener() {
+
+                @Override
+                public void onFocusChange(View v, boolean hasFocus) {
+                    if(hasFocus) {
+                        switch(mVirtualDpadKeyType) {
+                            case UP:
+                            if (!mShouldStartVirtualKeyPresses) {
+                                return;
+                            }
+                            simulateKeyEvent(KeyEvent.KEYCODE_DPAD_UP); 
+                            resetVirtualNavigationFocus();                          
+                            break;
+                            case DOWN:
+                            if (!mShouldStartVirtualKeyPresses) {
+                                return;
+                            }
+                            simulateKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN);
+                            resetVirtualNavigationFocus();
+                            break;
+                            case LEFT:
+                            if (!mShouldStartVirtualKeyPresses) {
+                                return;
+                            }
+                            simulateKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT);
+                            resetVirtualNavigationFocus();
+                            break;
+                            case RIGHT:
+                            if (!mShouldStartVirtualKeyPresses) {
+                                return;
+                            }
+                            simulateKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT);
+                            resetVirtualNavigationFocus();
+                            break;
+                            case CENTER:
+                            if (!mShouldStartVirtualKeyPresses) {
+                                mShouldStartVirtualKeyPresses = true;
+                            }
+                            break;
+                        }
+                    }
+                }
+             });
+             setOnKeyListener(new OnKeyListener() {
+                 
+                 @Override
+                 public boolean onKey(View v, int keyCode, KeyEvent event) {
+                     if(keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_SEARCH) {
+                         //Set back key handled or else Android will pause the app. Let SurfaceView decide
+                         //if app must be paused.
+                         //Voice search key is handled here so that Tivo voice search opens and not google search
+                         //when Talkback feature is enabled
+                         return true;    
+                     }
+                     return false;
+                 }
+             });
+             setOnClickListener(new OnClickListener() {
+
+                 @Override
+                 public void onClick (View v) {
+                     simulateKeyEvent(KeyEvent.KEYCODE_DPAD_CENTER);
+                 }
+             });
+             //Adding this below the mSurfaceView
+             mLayout.addView(this, mVirtualDpadKeyType.ordinal());
+        }
+    }
+
+    private void resetVirtualNavigationFocus() {
+        //Must delay requesting focus or else Android doesn't always assign focus, 100 ms is magic!
+        mVirtualNavigationFocusHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if(mCenterVirtualDpadKey != null) {
+                        mCenterVirtualDpadKey.requestFocus();
+                    }
+                }
+            }
+        , 100);
+    }
+
+    private void simulateKeyEvent(int keyCode) {
+        KeyEvent actionDown = new KeyEvent(KeyEvent.ACTION_DOWN, keyCode);
+        actionDown.setSource(InputDevice.SOURCE_KEYBOARD);
+        mSurface.onKey(null, keyCode, actionDown);
+        KeyEvent actionUp = new KeyEvent(KeyEvent.ACTION_UP, keyCode);
+        actionUp.setSource(InputDevice.SOURCE_KEYBOARD);
+        mSurface.onKey(null, keyCode, actionUp);
+    }
+
+    /** Called by onStop or surfaceDestroyed. Even if surfaceDestroyed
      *  is the first to be called, mIsSurfaceReady should still be set
      *  to 'true' during the call to onPause (in a usual scenario).
      */
-    public static void handlePause() {
-        if (!SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady) {
+    public static void handlePause()
+    {
+        /*Log.v(TAG, "handlePause(): SDLActivity.mIsPaused " + (SDLActivity.mIsPaused ? "true" : "false") + "\n" +
+                                   "SDLActivity.mIsSurfaceReady " + (SDLActivity.mIsSurfaceReady ? "true" : "false"));*/
+        if (!SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady) 
+        {
             SDLActivity.mIsPaused = true;
             SDLActivity.nativePause();
             mSurface.handlePause();
@@ -311,8 +825,13 @@ public class SDLActivity extends Activity {
      * Note: Some Android variants may send multiple surfaceChanged events, so we don't need to resume
      * every time we get one of those events, only if it comes after surfaceDestroyed
      */
-    public static void handleResume() {
-        if (SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady && SDLActivity.mHasFocus) {
+    public static void handleResume() 
+    {
+        /*Log.v(TAG, "handleResume(): SDLActivity.mIsPaused " + (SDLActivity.mIsPaused ? "true" : "false") + "\n" +
+                                   "SDLActivity.mIsSurfaceReady " + (SDLActivity.mIsSurfaceReady ? "true" : "false") + "\n" +
+                                   "SDLActivity.mHasFocus " + (SDLActivity.mHasFocus ? "true" : "false"));*/
+        if (SDLActivity.mIsPaused && SDLActivity.mIsSurfaceReady && SDLActivity.mHasFocus) 
+        {
             SDLActivity.mIsPaused = false;
             SDLActivity.nativeResume();
             mSurface.handleResume();
@@ -324,8 +843,10 @@ public class SDLActivity extends Activity {
         SDLActivity.mSDLThread = null;
         mSingleton.finish();
 
-        // This fixes bad state errors when calling exit from C++, then resuming later
-        System.exit(0);
+        // Simply exit the Java VM, because the native thread exiting is not
+        // an expected condition and there is no way to recover from this.  On
+        // exiting the VM, Android will re-start the app gracefully.
+        System.exit(-1);
     }
 
 
@@ -347,6 +868,10 @@ public class SDLActivity extends Activity {
      */
     protected boolean onUnhandledMessage(int command, Object param) {
         return false;
+    }
+
+    public static void flipBuffers()
+    {
     }
 
     /**
@@ -1030,8 +1555,8 @@ class SDLMain implements Runnable {
         // Runs SDL_main()
         SDLActivity.nativeInit(SDLActivity.mSingleton.getArguments());
 
-        org.haxe.HXCPP.run("ApplicationMain");
-        //Log.v("SDL", "SDL thread terminated");
+        org.haxe.HXCPP.run ("ApplicationMain");
+        Log.e("SDL", "Native thread exited unexpectedly");
     }
 }
 
@@ -1055,6 +1580,7 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
     // Startup
     public SDLSurface(Context context) {
         super(context);
+        getHolder().setFormat(android.graphics.PixelFormat.RGBA_8888);
         getHolder().addCallback(this);
 
         setFocusable(true);
@@ -1082,7 +1608,6 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
     public void handleResume() {
         setFocusable(true);
         setFocusableInTouchMode(true);
-        requestFocus();
         setOnKeyListener(this);
         setOnTouchListener(this);
         enableSensor(Sensor.TYPE_ACCELEROMETER, true);
@@ -1114,6 +1639,12 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
     public void surfaceChanged(SurfaceHolder holder,
                                int format, int width, int height) {
         Log.v("SDL", "surfaceChanged()");
+
+//        Log.e("SDL", "Surface changed @ " + width + "x" + height);
+//        
+//        if (width != 1280) {
+//            getHolder().setFixedSize(1280, 720);
+//        }
 
         int sdlFormat = 0x15151002; // SDL_PIXELFORMAT_RGB565 by default
         switch (format) {
@@ -1167,7 +1698,7 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
 
  
         boolean skip = false;
-        int requestedOrientation = SDLActivity.mSingleton.getRequestedOrientation();
+        int requestedOrientation = (SDLActivity.mSingleton == null) ? ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED : SDLActivity.mSingleton.getRequestedOrientation();
 
         if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
         {
@@ -1244,7 +1775,22 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
         // Dispatch the different events depending on where they come from
         // Some SOURCE_JOYSTICK, SOURCE_DPAD or SOURCE_GAMEPAD are also SOURCE_KEYBOARD
         // So, we try to process them as JOYSTICK/DPAD/GAMEPAD events first, if that fails we try them as KEYBOARD
-        //
+
+        // XXX TiVo -- reversed the order of these, else things just don't
+        // work in haxe
+        if ((event.getSource() & InputDevice.SOURCE_KEYBOARD) != 0) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                //Log.v("SDL", "key down: " + keyCode);
+                SDLActivity.onNativeKeyDown(keyCode);
+                return true;
+            }
+            else if (event.getAction() == KeyEvent.ACTION_UP) {
+                //Log.v("SDL", "key up: " + keyCode);
+                SDLActivity.onNativeKeyUp(keyCode);
+                return true;
+            }
+        }
+
         // Furthermore, it's possible a game controller has SOURCE_KEYBOARD and
         // SOURCE_JOYSTICK, while its key events arrive from the keyboard source
         // So, retrieve the device itself and check all of its sources
@@ -1261,16 +1807,17 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
             }
         }
 
-        if ((event.getSource() & InputDevice.SOURCE_KEYBOARD) != 0) {
-            if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                //Log.v("SDL", "key down: " + keyCode);
-                SDLActivity.onNativeKeyDown(keyCode);
-                return true;
-            }
-            else if (event.getAction() == KeyEvent.ACTION_UP) {
-                //Log.v("SDL", "key up: " + keyCode);
-                SDLActivity.onNativeKeyUp(keyCode);
-                return true;
+        if ((event.getSource() & InputDevice.SOURCE_MOUSE) != 0) {
+            // on some devices key events are sent for mouse BUTTON_BACK/FORWARD presses
+            // they are ignored here because sending them as mouse input to SDL is messy
+            if ((keyCode == KeyEvent.KEYCODE_BACK) || (keyCode == KeyEvent.KEYCODE_FORWARD)) {
+                switch (event.getAction()) {
+                case KeyEvent.ACTION_DOWN:
+                case KeyEvent.ACTION_UP:
+                    // mark the event as handled or it will be handled by system
+                    // handling KEYCODE_BACK by system will call onBackPressed()
+                    return true;
+                }
             }
         }
 
@@ -1746,5 +2293,30 @@ class SDLGenericMotionListener_API12 implements View.OnGenericMotionListener {
 
         // Event was not managed
         return false;
+    }
+}
+
+class SDLRelativeLayout extends RelativeLayout
+{
+    private View mSdlView = null;
+
+    public SDLRelativeLayout(Context context, View sdlView)
+    {
+        super(context);
+        if (sdlView != null)
+        {
+            mSdlView = sdlView;
+            addView(mSdlView);
+        }
+    }
+    
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event)
+    {
+        if (mSdlView != null && getFocusedChild() != mSdlView)
+        {
+            mSdlView.dispatchKeyEvent(event);
+        }
+        return super.dispatchKeyEvent(event);
     }
 }

@@ -40,6 +40,12 @@ class AndroidHelper {
 			
 			task = project.environment.get ("ANDROID_GRADLE_TASK");
 			
+		var build = "debug";
+
+        if (!project.debug) {
+            
+			build = "release";
+            
 		}
 		
 		if (PlatformHelper.hostPlatform != Platform.WINDOWS) {

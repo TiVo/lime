@@ -79,6 +79,28 @@ class CommandLineTools {
 			Sys.println ("");
 			
 		}
+
+		var overridesFile = "";
+
+		if (words.length == 2) {
+			if (FileSystem.exists (words[0]) && FileSystem.isDirectory (words[0])) {
+				overridesFile = findOverridesFile (words[0]);
+			}
+		} else {
+			overridesFile = findOverridesFile (Sys.getCwd ());
+		}
+
+		if (overridesFile.length > 0) {
+			var oldWd = Sys.getCwd ();
+			try { Sys.setCwd (Path.directory (overridesFile)); } catch (e:Dynamic) {}
+			var overridesFileProject = new ProjectXMLParser (Path.withoutDirectory (overridesFile));
+			if (overridesFileProject != null) {
+				LogHelper.info ("", '${LogHelper.accentColor}Using overrides file: ${Path.withoutDirectory(overridesFile)} ${LogHelper.resetColor}');
+				overridesFileProject.architectures = [];
+				overrides.merge(overridesFileProject);
+			}
+			try { Sys.setCwd (oldWd); } catch (e:Dynamic) {}
+		}
 		
 		switch (command) {
 			
@@ -959,6 +981,21 @@ class CommandLineTools {
 		
 	}
 	
+
+	private function findOverridesFile (path:String):String {
+
+		if (FileSystem.exists (PathHelper.combine (path, "overrides.lime"))) {
+			
+			return PathHelper.combine (path, "overrides.lime");
+			
+		} else if (FileSystem.exists (PathHelper.combine (path, "overrides.xml"))) {
+			
+			return PathHelper.combine (path, "overrides.xml");
+			
+		}
+
+		return "";
+	}
 	
 	private function findProjectFile (path:String):String {
 		

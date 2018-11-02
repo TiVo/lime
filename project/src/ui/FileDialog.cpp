@@ -34,6 +34,7 @@ namespace lime {
 			std::wcstombs (_defaultPath, defaultPath->c_str (), size);
 			
 		}
+#endif
 		
 		const char* path = tinyfd_selectFolderDialog ("", _defaultPath);
 		
@@ -157,7 +158,8 @@ namespace lime {
 			files->push_back (new std::wstring (__paths->substr (start).c_str ()));
 			
 		}
-		
+        
+#endif
 	}
 	
 	
@@ -187,6 +189,7 @@ namespace lime {
 			std::wcstombs (_defaultPath, defaultPath->c_str (), size);
 			
 		}
+#endif
 		
 		const char* path = tinyfd_saveFileDialog ("", _defaultPath, 0, NULL, NULL);
 		

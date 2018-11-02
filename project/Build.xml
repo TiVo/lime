@@ -10,6 +10,7 @@
 	<set name="tvos" value="1" if="appletv" />
 	
 	<set name="LIME_CAIRO" value="1" />
+    <set name="LIME_C_ARES" value="1" />
 	<set name="LIME_CURL" value="1" unless="emscripten" />
 	<set name="LIME_JPEG" value="1" />
 	<set name="LIME_FREETYPE" value="1" />
@@ -33,7 +34,11 @@
 	<set name="OUTPUT_DIR" value="../ndll" unless="OUTPUT_DIR" />
 	<set name="NATIVE_TOOLKIT_PATH" value="lib" unless="NATIVE_TOOLKIT_PATH" />
 	
-	<set name="NATIVE_TOOLKIT_CURL_SSL" value="1" />
+    <!-- TiVo disable this because it conflicts with the openssl included in
+         platform/network clientcore library.  This probably means that
+         lime URL loader will not be able to use SSL, not sure if this
+         matters -->
+	<!-- <set name="NATIVE_TOOLKIT_CURL_SSL" value="1" /> -->
 	<set name="NATIVE_TOOLKIT_CURL_DISABLE_AXTLS_NONBLOCKING" value="1" />
 	<set name="NATIVE_TOOLKIT_SDL_STATIC" value="1" />
 	
@@ -262,6 +267,7 @@
 	</files>
 	
 	<include name="lib/cairo/files.xml" />
+    <include name="lib/c-ares/files.xml" />
 	<include name="lib/curl/files.xml" />
 	<include name="lib/freetype/files.xml" />
 	<include name="lib/harfbuzz/files.xml" />
@@ -288,6 +294,7 @@
 		<files id="lime" />
 		
 		<files id="native-toolkit-cairo" if="LIME_CAIRO" />
+        <files id="native-toolkit-c-ares" if="LIME_C_ARES" />
 		<files id="native-toolkit-curl" if="LIME_CURL" />
 		<files id="native-toolkit-jpeg" if="LIME_JPEG" />
 		<files id="native-toolkit-freetype" if="LIME_FREETYPE" />

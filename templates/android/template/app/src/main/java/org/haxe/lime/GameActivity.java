@@ -15,6 +15,7 @@ import android.view.KeyCharacterMap;
 import android.view.View;
 import android.webkit.MimeTypeMap;
 import java.io.File;
+import android.view.WindowManager.LayoutParams;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -118,6 +119,14 @@ public class GameActivity extends SDLActivity {
 			extension.onCreate (state);
 			
 		}
+		//Set to have the window pan when an input method is shown 
+		//eg: KeyBoard input on TextField's inside the WebView.
+		//We prefer PAN over RESIZE because for TV apps the focus
+		//will be on the keyboard and the user will not be able to
+		//interact with other elements anyways (as in the case of
+		//touch devices) without dismissing the keyboard. 
+		getWindow().setSoftInputMode(android.view.WindowManager
+						.LayoutParams.SOFT_INPUT_ADJUST_PAN);
 		
 	}
 	
