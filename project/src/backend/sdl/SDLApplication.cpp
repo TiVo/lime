@@ -169,15 +169,17 @@ namespace lime {
 			case SDL_APP_WILLENTERBACKGROUND:
                 //SDL_Log("SDL Application::HandleEvent-- SDL_APP_WILLENTERBACKGROUND -- app is now paused.");
 				inBackground = true;
+				
 				windowEvent.type = WINDOW_DEACTIVATE;
 				WindowEvent::Dispatch (&windowEvent);
 				break;
 			
 			case SDL_APP_WILLENTERFOREGROUND:
                 //SDL_Log("SDL Application::HandleEvent-- SDL_APP_WILLENTERFOREGROUND -- app is now unpaused.");
-				inBackground = false;
 				windowEvent.type = WINDOW_ACTIVATE;
 				WindowEvent::Dispatch (&windowEvent);
+				
+				inBackground = false;
 				break;
 			
 			case SDL_CONTROLLERAXISMOTION:
@@ -804,7 +806,7 @@ namespace lime {
 		
 	}
 	
-		
+	
 	bool SDLApplication::Update () {
 		
 		SDL_Event event;
