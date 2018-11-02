@@ -126,7 +126,7 @@ class HXProject {
 		targetFlags = StringMapHelper.copy (_targetFlags);
 		templatePaths = _templatePaths.copy ();
 		
-		defaultMeta = { title: "MyApplication", description: "", packageName: "com.example.myapp", version: "1.0.0", company: "", companyUrl: "", buildNumber: null, companyId: "" }
+		defaultMeta = { title: "MyApplication", description: "", packageName: "com.tivo.haxe.test", version: "1.0.0", company: "", companyUrl: "", buildNumber: "1", companyId: "" }
 		defaultApp = { main: "Main", file: "MyApplication", path: "bin", preloader: "", swfVersion: 11.2, url: "", init: null }
 		defaultWindow = { width: 800, height: 600, parameters: "{}", background: 0xFFFFFF, fps: 30, hardware: true, display: 0, resizable: true, borderless: false, orientation: Orientation.AUTO, vsync: false, fullscreen: false, allowHighDPI: true, antialiasing: 0, allowShaders: true, requireShaders: false, depthBuffer: false, stencilBuffer: false }
 		
@@ -1341,21 +1341,21 @@ class HXProject {
 				
 			}
 
-            if (certificate.developmentTeam != null) {
+            if (keystore.developmentTeam != null) {
 
-                context.KEY_STORE_DEVELOPMENT_TEAM = certificate.developmentTeam;
-                
+                context.KEY_STORE_DEVELOPMENT_TEAM = keystore.developmentTeam;
+
             }
 			
-            if (certificate.provisioningProfile != null) {
+            if (keystore.provisioningProfile != null) {
 
-                context.KEY_STORE_PROVISIONING_PROFILE = certificate.provisioningProfile;
+                context.KEY_STORE_PROVISIONING_PROFILE = keystore.provisioningProfile;
                 
             }
 
-            if (certificate.provisioningProfileSpecifier != null) {
+            if (keystore.provisioningProfileSpecifier != null) {
 
-                context.KEY_STORE_PROVISIONING_PROFILE_SPECIFIER = certificate.provisioningProfileSpecifier;
+                context.KEY_STORE_PROVISIONING_PROFILE_SPECIFIER = keystore.provisioningProfileSpecifier;
                 
             }
 

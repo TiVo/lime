@@ -25,9 +25,6 @@ import lime.ui.KeyModifier;
 import lime.ui.Touch;
 import lime.ui.Window;
 
-#if !lime_debug
-@:fileXml('tags="haxe,release"')
-@:noDebug
 #if cpp
 typedef NativeDeque<T> = cpp.vm.Deque<T>;
 #elseif java
@@ -38,6 +35,12 @@ typedef NativeDeque<T> = neko.vm.Deque<T>;
 
 #if !macro
 @:build(lime.system.CFFI.build())
+#end
+
+#if !lime_debug
+@:fileXml('tags="haxe,release"')
+@:noDebug
+#end
 
 @:access(haxe.Timer)
 @:access(lime._backend.native.NativeCFFI)

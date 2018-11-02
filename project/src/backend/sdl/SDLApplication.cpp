@@ -24,7 +24,6 @@ namespace lime {
 	
 	const int USEREVENT_UPDATE = 0;
 	const int USEREVENT_SCHEDULE = 1;
-    bool app_paused = false;
 	
 	SDLApplication::SDLApplication () {
 		
@@ -135,7 +134,7 @@ namespace lime {
 						}
 						
 						ApplicationEvent::Dispatch (&applicationEvent);
-                        if (!app_paused || renderEvent.type != RENDER)
+                        if (!inBackground || renderEvent.type != RENDER)
                         {
                             //dispatch the types other than RENDER always, 
                             //only dispatch RENDER when unpaused.
@@ -169,18 +168,16 @@ namespace lime {
 			
 			case SDL_APP_WILLENTERBACKGROUND:
                 //SDL_Log("SDL Application::HandleEvent-- SDL_APP_WILLENTERBACKGROUND -- app is now paused.");
-				app_paused = true;
+				inBackground = true;
 				windowEvent.type = WINDOW_DEACTIVATE;
 				WindowEvent::Dispatch (&windowEvent);
 				break;
 			
 			case SDL_APP_WILLENTERFOREGROUND:
                 //SDL_Log("SDL Application::HandleEvent-- SDL_APP_WILLENTERFOREGROUND -- app is now unpaused.");
-				app_paused = false;
+				inBackground = false;
 				windowEvent.type = WINDOW_ACTIVATE;
 				WindowEvent::Dispatch (&windowEvent);
-				
-				inBackground = false;
 				break;
 			
 			case SDL_CONTROLLERAXISMOTION:

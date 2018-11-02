@@ -30,7 +30,7 @@ class AndroidHelper {
 		
 		var task = "assembleDebug";
 		
-		if (project.keystore != null) {
+		if (project.debug != null) {
 			
 			task = "assembleRelease";
 			
@@ -39,13 +39,7 @@ class AndroidHelper {
 		if (project.environment.exists ("ANDROID_GRADLE_TASK")) {
 			
 			task = project.environment.get ("ANDROID_GRADLE_TASK");
-			
-		var build = "debug";
 
-        if (!project.debug) {
-            
-			build = "release";
-            
 		}
 		
 		if (PlatformHelper.hostPlatform != Platform.WINDOWS) {

@@ -5,6 +5,7 @@ class Keystore {
 	
 	public var alias:String;
 	public var aliasPassword:String;
+	public var identity:String;
 	public var password:String;
 	public var path:String;
 	public var type:String;

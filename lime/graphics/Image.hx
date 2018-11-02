@@ -1428,7 +1428,7 @@ class Image {
 			
 		#else
 			
-			throw "ImageBuffer.loadFromBytes not supported on this target";
+			throw "ImageBuffer.fromPixels not supported on this target";
 			
 		#end
 		
