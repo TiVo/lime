@@ -1368,13 +1368,13 @@ class Image {
 			if (data != null) {
 
 				__fromImageBuffer (new ImageBuffer (new UInt8Array (@:privateAccess new Bytes (data.data.buffer.length, data.data.buffer.b)), data.width, data.height, data.bitsPerPixel));
+            }
+            #end
 				
-				if (onload != null) {
+			if (onload != null) {
 					
-					onload (this);
+                onload (this);
 					
-				}
-				
 			}
 			
 		#else

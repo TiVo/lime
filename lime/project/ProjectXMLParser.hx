@@ -1780,23 +1780,22 @@ class ProjectXMLParser extends HXProject {
 							
 							config.set ("ios.team-id", element.att.resolve ("team-id"));
 							config.set ("tvos.team-id", element.att.resolve ("team-id"));
-							certificate = new Keystore ();
-							certificate.identity = substitute (element.att.identity);
+							keystore.identity = substitute (element.att.identity);
                             if (element.has.developmentTeam) {
 
-                                certificate.developmentTeam = substitute (element.att.developmentTeam);
+                                keystore.developmentTeam = substitute (element.att.developmentTeam);
                                 
                             }
 
                             if (element.has.provisioningProfile) {
 
-                                certificate.provisioningProfile = substitute (element.att.provisioningProfile);
+                                keystore.provisioningProfile = substitute (element.att.provisioningProfile);
                                 
                             }
                             
                             if (element.has.provisioningProfileSpecifier) {
 
-                                certificate.provisioningProfileSpecifier = substitute (element.att.provisioningProfileSpecifier);
+                                keystore.provisioningProfileSpecifier = substitute (element.att.provisioningProfileSpecifier);
                                 
                             }
 							
