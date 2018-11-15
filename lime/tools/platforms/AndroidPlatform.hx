@@ -76,8 +76,8 @@ class AndroidPlatform extends PlatformTarget {
 		
 		for (architecture in architectures) {
 			
-			var haxeParams = [ hxml, "-D", "android", "-D", "android-9" ];
-			var cppParams = [ "-Dandroid", "-Dandroid-9" ];
+			var haxeParams = [ hxml, "-D", "android" ];
+			var cppParams = [ "-Dandroid" ];
 			var path = sourceSet + "/jniLibs/armeabi";
 			var suffix = ".so";
 			
@@ -211,9 +211,9 @@ class AndroidPlatform extends PlatformTarget {
 		
 		var commands = [];
 		
-		if (armv5) commands.push ([ "-Dandroid", "-DPLATFORM=android-9" ]);
-		if (armv7) commands.push ([ "-Dandroid", "-DHXCPP_ARMV7", "-DHXCPP_ARM7", "-DPLATFORM=android-9" ]);
-		if (x86) commands.push ([ "-Dandroid", "-DHXCPP_X86", "-DPLATFORM=android-9" ]);
+		if (armv5) commands.push ([ "-Dandroid"]);
+		if (armv7) commands.push ([ "-Dandroid", "-DHXCPP_ARMV7", "-DHXCPP_ARM7"]);
+		if (x86) commands.push ([ "-Dandroid", "-DHXCPP_X86"]);
 		
 		CPPHelper.rebuild (project, commands);
 		
