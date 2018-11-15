@@ -15,9 +15,9 @@ HAXELIB_NAME := lime
 # doesn't need one to be generated
 SUPPRESS_HAXELIB_JSON := 1
 
-PRE_BOM_TARGETS += BuildRunScript BuildTools
+PRE_BOM_TARGETS += BuildRunScript
 
-ifeq ($(HAXE_BUILD_TARGET),android)
+ifeq (android, $(findstring android, $(HAXE_BUILD_TARGET)))
 PRE_BOM_TARGETS += BuildLibs BuildNative
 endif
 
@@ -64,14 +64,6 @@ $(HAXELIB_STAGED_DIR)/run.n: $(STAGE_HAXELIB_TARGET) tools/run.hxml
 	$(ECHO) "$(COLOR)Rebuilding Lime command for $(HAXE_HOST_SYSTEM)$(UNCOLOR)";
 	$(Q) cd $(HAXELIB_STAGED_DIR)/tools; \
 	  $(HAXE) run.hxml
-
-.PHONY: BuildTools
-BuildTools: $(HAXELIB_STAGED_DIR)/tools/tools.n
-$(HAXELIB_STAGED_DIR)/tools/tools.n: $(STAGE_HAXELIB_TARGET) tools/tools.hxml
-	@$(ECHO) -n "$(ISMCOLOR)$(ISM_NAME)$(UNCOLOR): "; \
-	$(ECHO) "$(COLOR)Rebuilding Lime tools for $(HAXE_HOST_SYSTEM)$(UNCOLOR)";
-	$(Q) cd $(HAXELIB_STAGED_DIR)/tools; \
-	  $(HAXE) tools.hxml
 
 .PHONY: BuildLibs
 BuildLibs: $(BUILDLIBSTAMP)
