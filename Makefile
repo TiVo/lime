@@ -67,7 +67,7 @@ $(HAXELIB_STAGED_DIR)/run.n: $(STAGE_HAXELIB_TARGET) tools/run.hxml
 
 .PHONY: BuildLibs
 BuildLibs: $(BUILDLIBSTAMP)
-$(BUILDLIBSTAMP): $(HAXELIB_STAGED_DIR)/run.n $(HAXELIB_STAGED_DIR)/tools/tools.n
+$(BUILDLIBSTAMP): $(HAXELIB_STAGED_DIR)/run.n
 	@$(ECHO) -n "$(ISMCOLOR)$(ISM_NAME)$(UNCOLOR): "; \
 	$(ECHO) "$(COLOR)Rebuilding Lime libraries for $(HAXE_HOST_SYSTEM)$(UNCOLOR)";
 	$(Q) cd $(HAXELIB_STAGED_DIR); \
@@ -75,7 +75,7 @@ $(BUILDLIBSTAMP): $(HAXELIB_STAGED_DIR)/run.n $(HAXELIB_STAGED_DIR)/tools/tools.
 	  touch $(BUILDLIBSTAMP)
 
 .PHONY: BuildNative
-BuildNative: $(HAXELIB_STAGED_DIR)/run.n $(HAXELIB_STAGED_DIR)/tools/tools.n $(BUILDLIBSTAMP)
+BuildNative: $(HAXELIB_STAGED_DIR)/run.n $(BUILDLIBSTAMP)
 	@$(ECHO) -n "$(ISMCOLOR)$(ISM_NAME)$(UNCOLOR): "; \
 	$(ECHO) "$(COLOR)Rebuilding Lime libraries for $(HAXE_BUILD_TARGET)$(UNCOLOR)";
 	$(Q) cd $(HAXELIB_STAGED_DIR); \
