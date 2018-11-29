@@ -15,8 +15,8 @@ import lime.tools.helpers.ProcessHelper;
 
 class RunScript {
 	
-	
-	private static function rebuildTools (rebuildBinaries = true):Void {
+
+	private static function rebuildTools (rebuildBinaries = false):Void {
 		
 		var limeDirectory = PathHelper.getHaxelib (new Haxelib ("lime"), true);
 		var toolsDirectory = PathHelper.combine (limeDirectory, "tools");
