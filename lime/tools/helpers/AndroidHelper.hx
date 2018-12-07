@@ -30,7 +30,7 @@ class AndroidHelper {
 		
 		var task = "assembleDebug";
 		
-		if (project.debug != null) {
+		if (project.debug != null && ! project.debug) {
 			
 			task = "assembleRelease";
 
