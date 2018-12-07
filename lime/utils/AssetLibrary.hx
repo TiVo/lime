@@ -178,6 +178,12 @@ class AssetLibrary {
 			
 			return cachedBytes.get (id);
 			
+		} else if (cachedText.exists (id)) {
+			
+			var bytes = Bytes.ofString (cachedText.get (id));
+			cachedBytes.set (id, bytes);
+			return bytes;
+			
 		} else if (classTypes.exists (id)) {
 			
 			#if flash
@@ -391,6 +397,8 @@ class AssetLibrary {
 			
 			for (id in preload.keys ()) {
 				
+				Log.verbose ("Preloading asset: " + id);
+				
 				switch (types.get (id)) {
 					
 					case BINARY:
@@ -594,6 +602,12 @@ class AssetLibrary {
 	private function __assetLoaded (id:String):Void {
 		
 		assetsLoaded++;
+		
+		if (id != null) {
+			
+			Log.verbose ("Loaded asset: " + id + " [" + (assetsLoaded - 1) + "/" + (assetsTotal - 1) + "]");
+			
+		}
 		
 		if (id != null) {
 			

@@ -21,6 +21,7 @@ import lime.math.color.RGBA;
 import lime.math.ColorMatrix;
 import lime.math.Rectangle;
 import lime.math.Vector2;
+import lime.net.HTTPRequest;
 import lime.system.CFFI;
 import lime.utils.ArrayBuffer;
 import lime.utils.UInt8Array;
@@ -477,7 +478,7 @@ class Image {
 	}
 	
 	
-	public static function fromBase64 (base64:String, type:String, onload:Image->Void):Image {
+	public static function fromBase64 (base64:String, type:String #if (lime < "4.0.0"), onload:Image->Void #end):Image {
 		
 		if (base64 == null) return null;
 		var image = new Image ();
@@ -505,7 +506,7 @@ class Image {
 	}
 	
 	
-	public static function fromBytes (bytes:Bytes, onload:Image->Void = null):Image {
+	public static function fromBytes (bytes:Bytes #if (lime < "4.0.0"), onload:Image->Void = null #end):Image {
 		
 		if (bytes == null) return null;
 		var image = new Image ();
@@ -539,7 +540,7 @@ class Image {
 	}
 	
 	
-	public static function fromFile (path:String, onload:Image -> Void = null, onerror:Void -> Void = null):Image {
+	public static function fromFile (path:String #if (lime < "4.0.0"), onload:Image -> Void = null, onerror:Void -> Void = null #end):Image {
 		
 		if (path == null) return null;
 		var image = new Image ();
@@ -747,48 +748,48 @@ class Image {
 	
 	
 	public static function loadFromBase64 (base64:String, type:String):Future<Image> {
-
+		
 		if (base64 == null || type == null) return Future.withValue (null);
-
+		
 		var promise = new Promise<Image> ();
-
+		
 		#if (js && html5)
 		var image = new JSImage ();
-
+		
 		image.addEventListener ("load", function (event) {
-
+			
 			var buffer = new ImageBuffer (null, image.width, image.height);
 			buffer.__srcImage = cast image;
-
+			
 			promise.complete (new Image (buffer));
-
+			
 		}, false);
-
+		
 		image.addEventListener ("progress", function (event) {
-
+			
 			promise.progress (event.loaded, event.total);
-
+			
 		}, false);
-
+		
 		image.addEventListener ("error", function (event) {
-
+			
 			promise.error (event.detail);
-
+			
 		}, false);
-
+		
 		image.src = "data:" + type + ";base64," + base64;
-
+		
 		#else
-
+		
 		promise.error ("");
-
+		
 		#end
-
+		
 		return promise.future;
-
+		
 	}
-
-
+	
+	
 	public static function loadFromBytes (bytes:Bytes):Future<Image> {
 
 		if (bytes == null) return Future.withValue (null);
@@ -919,9 +920,22 @@ class Image {
 		return promise.future;
 
 		#else
+		
+		var request = new HTTPRequest<Image> ();
+		return request.load (path).then (function (image) {
 
-		return new Future<Image> (function () return fromFile (path), true);
+			if (image != null) {
 
+				return Future.withValue (image);
+
+			} else {
+
+				return cast Future.withError ("");
+
+			}
+
+		});
+		
 		#end
 
 	}
@@ -1432,7 +1446,7 @@ class Image {
 			}
 
 		#else
-			
+
 			throw "ImageBuffer.fromPixels not supported on this target";
 			
 		#end

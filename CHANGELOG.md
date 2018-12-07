@@ -1,3 +1,44 @@
+3.7.4 (02/15/2017)
+------------------
+
+* Improved AudioBuffer/Font/Image/Sound.loadFromFile to support URLs
+* Deprecated AudioBuffer.fromURL and onload/onerror callbacks
+* Added verbose log messages during asset library preload
+* Fixed crash on iOS when rewinding or looping sounds
+
+
+3.7.3 (02/13/2017)
+------------------
+
+* Improved support for Raspberry Pi
+* Improved configuration for Gradle version on Android builds
+* Fixed a crash in VorbisFile.fromBytes
+* Fixed httpRequest.timeout to timeout only on opening a connection
+* Fixed setting of system clipboard when using Clipboard.text on HTML5
+* Fixed Assets.getBytes for cached text assets
+* Fixed the final progress value when using -Dsimulate-preloader
+* Fixed valid image check when returning cached image assets
+* Fixed a minor memory leak in System application directories
+* Fixed filters and default file name in FileDialog
+* Fixed AudioBuffer.loadFromFile on native for remote assets
+
+
+3.7.2 (01/26/2017)
+------------------
+
+* Reverted high-DPI HTML5 mouse scale change
+* Improved the DPI values returned from display.dpi
+* Fixed "Update to Recommended Settings" message on Xcode 8.2
+
+
+3.7.1 (01/25/2017)
+------------------
+
+* Improved output of Flash Player log output
+* Fixed minor issues with Flash Player preload logic
+* Fixed use of AudioBuffer in multiple native AudioSource instances
+
+
 3.7.0 (01/24/2017)
 ------------------
 

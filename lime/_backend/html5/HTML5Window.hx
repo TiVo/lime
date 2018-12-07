@@ -376,9 +376,6 @@ class HTML5Window {
 				
 			}
 			
-			x /= scale;
-			y /= scale;
-			
 			switch (event.type) {
 				
 				case "mousedown":
@@ -453,7 +450,7 @@ class HTML5Window {
 			
 		} else {
 			
-			parent.onMouseWheel.dispatch (untyped event.deltaX / scale, - untyped event.deltaY / scale);
+			parent.onMouseWheel.dispatch (untyped event.deltaX, - untyped event.deltaY);
 			
 			if (parent.onMouseWheel.canceled) {
 				
@@ -729,6 +726,29 @@ class HTML5Window {
 	public function setBorderless (value:Bool):Bool {
 		
 		return value;
+		
+	}
+	
+	
+	public function setClipboard (value:String):Void {
+		
+		if (Browser.document.queryCommandEnabled ("copy")) {
+			
+			var inputEnabled = enableTextEvents;
+			
+			setEnableTextEvents (true); // create textInput if necessary
+			setEnableTextEvents (false);
+			
+			var cacheText = textInput.value;
+			textInput.value = value;
+			
+			Browser.document.execCommand ("copy");
+			
+			textInput.value = cacheText;
+			
+			setEnableTextEvents (inputEnabled);
+			
+		}
 		
 	}
 	

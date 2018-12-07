@@ -116,12 +116,12 @@ class NativeAudioSource {
 			
 			if (parent.buffer.__srcBuffer == null) {
 				
-				dataLength = parent.buffer.data.length;
-				
 				parent.buffer.__srcBuffer = AL.genBuffer ();
 				AL.bufferData (parent.buffer.__srcBuffer, format, parent.buffer.data, parent.buffer.data.length, parent.buffer.sampleRate);
 				
 			}
+			
+			dataLength = parent.buffer.data.length;
 			
 			handle = AL.genSource ();
 			AL.sourcei (handle, AL.BUFFER, parent.buffer.__srcBuffer);
@@ -404,9 +404,8 @@ class NativeAudioSource {
 			
 			var ratio = (secondOffset / totalSeconds);
 			var totalOffset = Std.int (dataLength * ratio);
-			var currentOffset = AL.getSourcei (handle, AL.BYTE_OFFSET);
 			
-			AL.sourcei (handle, AL.BYTE_OFFSET, totalOffset - currentOffset);
+			AL.sourcei (handle, AL.BYTE_OFFSET, totalOffset);
 			
 		}
 		

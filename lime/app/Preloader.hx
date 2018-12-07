@@ -11,6 +11,7 @@ import lime.system.System;
 import lime.utils.AssetLibrary;
 import lime.utils.Assets;
 import lime.utils.AssetType;
+import lime.utils.Log;
 
 #if (js && html5)
 import js.html.Image;
@@ -35,7 +36,7 @@ import flash.Lib;
 class Preloader #if flash extends Sprite #end {
 	
 	
-	public var complete:Bool;
+	public var complete (default, null):Bool;
 	public var onComplete = new Event<Void->Void> ();
 	public var onProgress = new Event<Int->Int->Void> ();
 	
@@ -49,6 +50,7 @@ class Preloader #if flash extends Sprite #end {
 	private var libraryNames:Array<String>;
 	private var loadedLibraries:Int;
 	private var loadedStage:Bool;
+	private var preloadStarted:Bool;
 	private var simulateProgress:Bool;
 	
 	
@@ -84,6 +86,7 @@ class Preloader #if flash extends Sprite #end {
 		timer.run = function () {
 			
 			currentTime = System.getTimer () - startTime;
+			if (currentTime > preloadTime) currentTime = preloadTime;
 			onProgress.dispatch (currentTime, preloadTime);
 			
 			if (currentTime >= preloadTime) {
@@ -142,8 +145,11 @@ class Preloader #if flash extends Sprite #end {
 		}
 		
 		loadedLibraries = -1;
+		preloadStarted = false;
 		
 		for (library in libraries) {
+			
+			Log.verbose ("Preloading asset library");
 			
 			library.load ().onProgress (function (loaded, total) {
 				
@@ -177,8 +183,7 @@ class Preloader #if flash extends Sprite #end {
 					
 				}
 				
-				loadedLibraries++;
-				updateProgress ();
+				loadedAssetLibrary ();
 				
 			}).onError (function (e) {
 				
@@ -197,12 +202,39 @@ class Preloader #if flash extends Sprite #end {
 		}
 		
 		loadedLibraries++;
+		preloadStarted = true;
+		updateProgress ();
+		
+	}
+	
+	
+	private function loadedAssetLibrary (name:String = null):Void {
+		
+		loadedLibraries++;
+		
+		var current = loadedLibraries;
+		if (!preloadStarted) current++;
+		
+		var totalLibraries = libraries.length + libraryNames.length;
+		
+		if (name != null) {
+			
+			Log.verbose ("Loaded asset library: " + name + " [" + current + "/" + totalLibraries + "]");
+			
+		} else {
+			
+			Log.verbose ("Loaded asset library [" + current + "/" + totalLibraries + "]");
+			
+		}
+		
 		updateProgress ();
 		
 	}
 	
 	
 	private function start ():Void {
+		
+		if (complete) return;
 		
 		complete = true;
 		
@@ -239,6 +271,8 @@ class Preloader #if flash extends Sprite #end {
 			initLibraryNames = true;
 			
 			for (name in libraryNames) {
+				
+				Log.verbose ("Preloading asset library: " + name);
 				
 				Assets.loadLibrary (name).onProgress (function (loaded, total) {
 					
@@ -293,8 +327,7 @@ class Preloader #if flash extends Sprite #end {
 						
 					}
 					
-					loadedLibraries++;
-					updateProgress ();
+					loadedAssetLibrary (name);
 					
 				}).onError (function (e) {
 					
@@ -307,6 +340,8 @@ class Preloader #if flash extends Sprite #end {
 		}
 		
 		if (!simulateProgress && #if flash loadedStage && #end loadedLibraries == (libraries.length + libraryNames.length)) {
+			
+			Log.verbose ("Preload complete");
 			
 			start ();
 			
@@ -350,7 +385,7 @@ class Preloader #if flash extends Sprite #end {
 	
 	private function loaderInfo_onComplete (event:flash.events.Event):Void {
 		
-		loadedStage = true;
+		//loadedStage = true;
 		
 		if (bytesTotalCache["_root"] > 0) {
 			

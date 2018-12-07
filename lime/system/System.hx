@@ -91,7 +91,21 @@ class System {
 			display.id = id;
 			display.name = displayInfo.name;
 			display.bounds = new Rectangle (displayInfo.bounds.x, displayInfo.bounds.y, displayInfo.bounds.width, displayInfo.bounds.height);
+			
+			#if ios
+			var tablet = NativeCFFI.lime_system_get_ios_tablet ();
+			var scale = Application.current.window.scale;
+			if (!tablet && scale > 2.46) {
+				display.dpi = 401; // workaround for iPhone Plus
+			} else {
+				display.dpi = (tablet ? 132 : 163) * scale;
+			}
+			#elseif android
+			var getDisplayDPI = JNI.createStaticMethod ("org/haxe/lime/GameActivity", "getDisplayDPI", "()D");
+			display.dpi = Math.round (getDisplayDPI ());
+			#else
 			display.dpi = displayInfo.dpi;
+			#end
 			
 			display.supportedModes = [];
 			
@@ -128,7 +142,13 @@ class System {
 			display.dpi = Capabilities.screenDPI;
 			display.currentMode = new DisplayMode (Std.int (Capabilities.screenResolutionX), Std.int (Capabilities.screenResolutionY), 60, ARGB32);
 			#elseif (js && html5)
-			display.dpi = 96; // TODO: Detect DPI on HTML5
+			//var div = Browser.document.createElement ("div");
+			//div.style.width = "1in";
+			//Browser.document.body.appendChild (div);
+			//var ppi = Browser.document.defaultView.getComputedStyle (div, null).getPropertyValue ("width");
+			//Browser.document.body.removeChild (div);
+			//display.dpi = Std.parseFloat (ppi);
+			display.dpi = 96 * Browser.window.devicePixelRatio;
 			display.currentMode = new DisplayMode (Browser.window.screen.width, Browser.window.screen.height, 60, ARGB32);
 			#end
 			

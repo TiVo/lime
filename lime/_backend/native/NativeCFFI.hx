@@ -9,9 +9,15 @@ import cpp.Float32;
 typedef Float32 = Float;
 #end
 
+#if !lime_debug
+@:fileXml('tags="haxe,release"')
+@:noDebug
+#end
+
 #if !macro
 @:build(lime.system.CFFI.build())
 #end
+
 
 class NativeCFFI {
 	
@@ -34,10 +40,10 @@ class NativeCFFI {
 	@:cffi private static function lime_deflate_compress (data:Dynamic, bytes:Dynamic):Dynamic;
 	@:cffi private static function lime_deflate_decompress (data:Dynamic, bytes:Dynamic):Dynamic;
 	@:cffi private static function lime_drop_event_manager_register (callback:Dynamic, eventObject:Dynamic):Void;
-	@:cffi private static function lime_file_dialog_open_directory (filter:String, defaultPath:String):Dynamic;
-	@:cffi private static function lime_file_dialog_open_file (filter:String, defaultPath:String):Dynamic;
-	@:cffi private static function lime_file_dialog_open_files (filter:String, defaultPath:String):Dynamic;
-	@:cffi private static function lime_file_dialog_save_file (filter:String, defaultPath:String):Dynamic;
+	@:cffi private static function lime_file_dialog_open_directory (title:String, filter:String, defaultPath:String):Dynamic;
+	@:cffi private static function lime_file_dialog_open_file (title:String, filter:String, defaultPath:String):Dynamic;
+	@:cffi private static function lime_file_dialog_open_files (title:String, filter:String, defaultPath:String):Dynamic;
+	@:cffi private static function lime_file_dialog_save_file (title:String, filter:String, defaultPath:String):Dynamic;
 	@:cffi private static function lime_font_get_ascender (handle:Dynamic):Int;
 	@:cffi private static function lime_font_get_descender (handle:Dynamic):Int;
 	@:cffi private static function lime_font_get_family_name (handle:Dynamic):Dynamic;
@@ -114,6 +120,7 @@ class NativeCFFI {
 	@:cffi private static function lime_system_set_allow_screen_timeout (value:Bool):Bool;
 	@:cffi private static function lime_system_get_directory (type:Int, company:String, title:String):Dynamic;
 	@:cffi private static function lime_system_get_display (index:Int):Dynamic;
+	@:cffi private static function lime_system_get_ios_tablet ():Bool;
 	@:cffi private static function lime_system_get_num_displays ():Int;
 	@:cffi private static function lime_system_get_timer ():Float;
 	@:cffi private static function lime_system_open_file (path:String):Void;
